@@ -109,3 +109,13 @@ export CX_CLIENT_SECRET="<client-secret>"
 
 - การอัป SARIF ไป Security tab ของ private repo ต้องมี GitHub Advanced Security ถ้าไม่มี step นั้นจะข้ามไป (`continue-on-error`) แต่รายงานยังดูได้ใน artifact และ PR comment จาก Checkmarx
 - ปรับความเข้มของ gate ได้ที่ `--threshold` เช่น `sast-high=1;sast-medium=5`
+
+## ทางเลือก: ใช้ Snyk (ระหว่างยังไม่มี Checkmarx tenant)
+
+workflow มี job `Snyk (Code + Open Source + IaC)` ที่ใช้ gate แบบเดียวกัน (High ขึ้นไป = fail)
+
+1. สมัคร https://snyk.io ด้วยบัญชี GitHub แล้ว import repo นี้
+2. เปิด Snyk Code ที่ Settings → Snyk Code → Enable
+3. copy token จาก Account settings (Auth Token หรือ Personal Access Token) แล้วรัน `gh secret set SNYK_TOKEN`
+
+ถ้าไม่ได้ใส่ `SNYK_TOKEN` job นี้จะข้ามพร้อม warning

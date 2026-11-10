@@ -1,6 +1,6 @@
-# POC: CI/CD + Security Gate (Snyk)
+# POC: CI/CD + Security Gate (Next.js + Snyk)
 
-โปรเจกต์ตัวอย่างสำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk** (SAST + SCA + IaC) และ **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
+แอปตัวอย่าง **Next.js (TypeScript)** สำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk** (SAST + SCA + IaC) และ **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
 
 ```
 push / PR ──► Build & unit test ──┐
@@ -8,59 +8,74 @@ push / PR ──► Build & unit test ──┐
               Code | Open Source | IaC
 ```
 
-> ตอนนี้ยังไม่ใช้ Checkmarx One (ต้องมี tenant แบบเสียเงิน) ถ้าจะกลับมาใช้ ดูหัวข้อ "เพิ่ม Checkmarx One ภายหลัง" ด้านล่าง
+## โครงสร้าง
+
+```
+app/page.tsx                   หน้า User search (/?q=alice)
+app/api/users/route.ts         GET /api/users?name=
+app/api/tools/ping/route.ts    GET /api/tools/ping?host=        (เฉพาะใน PR เดโม)
+app/api/tools/files/route.ts   GET /api/tools/files?name=       (เฉพาะใน PR เดโม)
+app/api/tools/notify/route.ts  POST /api/tools/notify {url}     (เฉพาะใน PR เดโม)
+lib/                           SQLite (better-sqlite3, in-memory)
+tests/                         Vitest รวม security regression test
+k8s/, Dockerfile               ไฟล์ IaC ที่ถูกสแกนด้วย
+```
 
 ## PR เดโม
 
 | Branch | เนื้อหา | ผลที่คาดหวัง |
 |---|---|---|
-| `demo/vulnerable-feature` | ฟีเจอร์ admin tools ที่มีช่องโหว่ตั้งใจใส่ไว้ | ❌ gate fail |
-| `demo/secure-feature` | ฟีเจอร์เดียวกันที่เขียนอย่างปลอดภัย | ✅ gate pass |
+| `demo/nextjs-vulnerable` | ฟีเจอร์ที่มีช่องโหว่ตั้งใจใส่ไว้ | ❌ gate fail |
+| `demo/nextjs-secure` | ฟีเจอร์เดียวกันที่เขียนอย่างปลอดภัย | ✅ gate pass |
 
-ช่องโหว่ที่ใส่ไว้ใน `demo/vulnerable-feature`:
-
-| ประเภท | ปัญหา | วิธีแก้ใน `demo/secure-feature` |
+| ประเภท | ❌ โค้ดที่มีช่องโหว่ | ✅ วิธีแก้ |
 |---|---|---|
-| SAST | Command Injection (`shell=True`) ใน `/tools/ping` | ตรวจ host + ส่ง argument เป็น list ไม่ผ่าน shell |
-| SAST | Path Traversal / XSS ใน `/tools/files` | allow-list ชื่อไฟล์ + `send_from_directory` แบบ `text/plain` |
-| SAST | SSRF + ปิด SSL verification ใน `/tools/notify` | อนุญาตเฉพาะ HTTPS ไปยัง host ที่กำหนด, เปิด TLS verification |
-| SAST | Hardcoded password | อ่านจาก env / Kubernetes Secret |
-| SCA | `urllib3==1.26.5` มี CVE | ไม่ downgrade |
-| IaC | `hostNetwork` / `hostPID`, secret เป็น plain text ใน k8s | ใช้ `secretKeyRef` |
-
-ประวัติก่อนหน้า: commit แรกของ `main` มีช่องโหว่ SQL Injection, dependency เก่า และ Dockerfile/k8s ที่ไม่ปลอดภัย ซึ่งแก้แล้วใน PR #1
+| SQL Injection | `` prepare(`... WHERE name = '${name}'`) `` | `prepare("... WHERE name = ?").all(name)` |
+| XSS | `dangerouslySetInnerHTML={{ __html: q }}` | `<p>{q}</p>` (React escape ให้) |
+| Command Injection | `` exec(`ping -c 1 ${host}`) `` | ตรวจ host + `execFile("ping", ["-c","1",host])` |
+| Path Traversal | `readFile(path.join(DIR, name))` + `text/html` | allow-list ชื่อไฟล์ + `text/plain` |
+| SSRF / TLS | `axios.post(userUrl, …, { rejectUnauthorized: false })` | อนุญาตเฉพาะ HTTPS host ที่กำหนด, ใช้ `fetch` ปกติ |
+| Hardcoded secret | `const WEBHOOK_PASSWORD = "SuperSecret123!"` | `process.env.WEBHOOK_PASSWORD` + k8s `secretKeyRef` |
+| Dependency เก่า (SCA) | `axios@0.21.1`, `lodash@4.17.15` | ไม่ใช้ / ใช้ `fetch` ที่มากับ Node |
+| IaC | k8s `hostNetwork`, `hostPID`, secret เป็น plain text | securityContext แบบ hardened |
 
 ## 1) รันในเครื่อง
 
-ต้องมี Python 3 และ Docker Desktop (เครื่อง M2 ใช้ได้)
+ต้องมี Node.js 22+ และ Docker Desktop (เครื่อง M2 ใช้ได้)
 
 ```bash
-cd ~/cicd-checkmarx-poc
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-python3 -m venv .venv-tools && .venv-tools/bin/pip install -r requirements-tools.txt
-```
-
-รัน unit test (มี security regression test สำหรับ injection, traversal และ SSRF):
-
-```bash
-.venv/bin/pytest -v
-```
-
-รัน security gate แบบ open source ไม่ต้องมีบัญชี (Bandit = SAST, pip-audit = SCA, KICS = IaC ผ่าน Docker):
-
-```bash
-./scripts/local-scan-oss.sh
-```
-
-ลองสลับ branch เพื่อดูผลต่างกัน:
-
-```bash
-git checkout demo/vulnerable-feature && ./scripts/local-scan-oss.sh
+cd ~/cicd-checkmarx-poc && npm install
 ```
 
 ```bash
-git checkout demo/secure-feature && ./scripts/local-scan-oss.sh
+npm run dev
 ```
+
+เปิด http://localhost:3000 แล้วลองค้นหา `alice`
+
+ลองโจมตีบน branch ที่มีช่องโหว่:
+
+```bash
+git checkout demo/nextjs-vulnerable && npm install && npm run dev
+```
+
+- SQL Injection: http://localhost:3000/api/users?name=%27%20OR%20%271%27=%271 คืน user ทุกคน
+- XSS: http://localhost:3000/?q=%3Cimg%20src=x%20onerror=alert(1)%3E ขึ้น alert
+- Path Traversal: http://localhost:3000/api/tools/files?name=../../package.json อ่านไฟล์นอกโฟลเดอร์ได้
+
+รัน test (มี security regression test ที่จะ fail บน branch ที่มีช่องโหว่):
+
+```bash
+npm test
+```
+
+รัน security gate ในเครื่อง ไม่ต้องมีบัญชี (Semgrep = SAST, npm audit = SCA, KICS = IaC ผ่าน Docker):
+
+```bash
+./scripts/local-scan.sh
+```
+
+> Semgrep rule ฟรีจับได้น้อยกว่า Snyk Code (ไม่ไล่ data flow ข้ามฟังก์ชันใน route handler) ในเครื่องจะเห็นแค่ hardcoded secret, dependency เก่า และ k8s ส่วน injection ทั้งหมดจะเห็นใน Snyk บน Actions
 
 ## 2) Snyk
 
@@ -75,17 +90,17 @@ git checkout demo/secure-feature && ./scripts/local-scan-oss.sh
 
 ## 3) GitHub Actions
 
-- workflow `.github/workflows/ci.yml` มี 2 job คือ `Build & unit test` และ `Snyk (Code + Open Source + IaC)`
+- workflow `.github/workflows/ci.yml` มี 2 job คือ `Build & unit test` (npm ci, test, build) และ `Snyk (Code + Open Source + IaC)`
 - gate ใช้ `--severity-threshold=high` ในทุกขั้นของ Snyk
 - สั่งรันเองได้ที่ tab Actions → *Run workflow* หรือ:
   ```bash
-  gh workflow run ci.yml --ref demo/vulnerable-feature
+  gh workflow run ci.yml --ref demo/nextjs-vulnerable
   ```
 - ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `Build & unit test` และ `Snyk (Code + Open Source + IaC)`
 
 ## เพิ่ม Checkmarx One ภายหลัง
 
-เมื่อได้ tenant แล้ว เพิ่ม job นี้ใน `ci.yml` และใส่ secret `CX_BASE_URI`, `CX_TENANT`, `CX_CLIENT_ID`, `CX_CLIENT_SECRET` (เวอร์ชันเต็มพร้อม SARIF/report และสคริปต์ `scripts/cx-scan.sh` ดูได้ใน git history ก่อน commit "Remove Checkmarx One job for now"):
+เมื่อได้ tenant แล้ว เพิ่ม job นี้ใน `ci.yml` และใส่ secret `CX_BASE_URI`, `CX_TENANT`, `CX_CLIENT_ID`, `CX_CLIENT_SECRET`:
 
 ```yaml
   checkmarx:

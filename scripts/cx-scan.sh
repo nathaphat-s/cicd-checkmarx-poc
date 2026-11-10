@@ -11,7 +11,7 @@ docker run --rm -v "$PWD":/src -w /src \
   -e CX_BASE_URI -e CX_TENANT -e CX_CLIENT_ID -e CX_CLIENT_SECRET \
   checkmarx/ast-cli:latest scan create \
   --project-name "cicd-checkmarx-poc" --branch "$BRANCH" \
-  -s /src --file-filter '!.venv,!kics-report,!cx-report' \
+  -s /src --file-filter '!.venv,!.venv-tools,!kics-report,!cx-report' \
   --scan-types sast,sca,kics \
   --threshold "sast-high=1;sca-high=1;kics-high=1" \
   --report-format summaryConsole,summaryHTML --output-path /src/cx-report

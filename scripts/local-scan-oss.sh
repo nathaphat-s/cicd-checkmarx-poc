@@ -7,14 +7,14 @@ cd "$(dirname "$0")/.."
 FAIL=0
 
 echo "== SAST (Bandit, Medium+ — Bandit rates SQLi as Medium) =="
-.venv/bin/bandit -r app -ll || FAIL=1
+.venv-tools/bin/bandit -r app -ll || FAIL=1
 
 echo; echo "== SCA (pip-audit) =="
-.venv/bin/pip-audit -r requirements.txt || FAIL=1
+.venv-tools/bin/pip-audit -r requirements.txt || FAIL=1
 
 echo; echo "== IaC (KICS via Docker, fail on HIGH) =="
 docker run --rm -v "$PWD":/path checkmarx/kics:latest scan \
-  -p /path --exclude-paths /path/.venv --fail-on high --no-progress \
+  -p /path --exclude-paths /path/.venv,/path/.venv-tools --fail-on high --no-progress \
   --report-formats json -o /path/kics-report >/dev/null
 KICS_RC=$?
 docker run --rm -v "$PWD":/path --entrypoint cat checkmarx/kics:latest /path/kics-report/results.json 2>/dev/null \

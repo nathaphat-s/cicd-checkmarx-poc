@@ -9,7 +9,7 @@ import subprocess
 from urllib.parse import urlparse
 
 import requests
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, jsonify, request, send_from_directory
 
 tools_bp = Blueprint("tools", __name__, url_prefix="/tools")
 
@@ -18,6 +18,7 @@ HOSTNAME_RE = re.compile(
     r"^(?=.{1,253}$)[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$"
 )
+ALLOWED_FILES = frozenset(os.listdir(FILES_DIR))
 ALLOWED_WEBHOOK_HOSTS = {"hooks.example.com"}
 
 
@@ -44,14 +45,11 @@ def ping():
 @tools_bp.get("/files")
 def read_file():
     name = request.args.get("name", "")
-    # ✅ resolve the real path and make sure it stays inside FILES_DIR
-    path = os.path.realpath(os.path.join(FILES_DIR, name))
-    if os.path.commonpath([path, FILES_DIR]) != FILES_DIR:
-        abort(400, "invalid file name")
-    if not os.path.isfile(path):
+    # ✅ allow-list of known files + send_from_directory (safe_join blocks "../"),
+    #    served as text/plain so the content is never rendered as HTML (no XSS)
+    if name not in ALLOWED_FILES:
         abort(404)
-    with open(path) as f:
-        return f.read()
+    return send_from_directory(FILES_DIR, name, mimetype="text/plain")
 
 
 @tools_bp.post("/notify")

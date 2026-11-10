@@ -83,3 +83,5 @@ jobs:
           gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
             -f state="$state" -f context="CI + Security Gate" -f description="$desc" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Fail this job too when the gate is blocked, so it is red in the Actions UI
+          [ "$state" = success ]

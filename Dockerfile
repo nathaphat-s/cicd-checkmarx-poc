@@ -1,6 +1,8 @@
 # ✅ Pinned slim base, multi-stage build, non-root user, HEALTHCHECK
 FROM node:22-alpine AS build
 WORKDIR /app
+# Build tools only in the build stage (better-sqlite3 may compile from source); they never reach the runtime image
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .

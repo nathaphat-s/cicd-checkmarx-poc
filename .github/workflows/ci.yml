@@ -16,11 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-      - run: pip install -r requirements-dev.txt
-      - run: pytest -v
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
 
   snyk:
     name: Snyk (Code + Open Source + IaC)
@@ -29,9 +31,10 @@ jobs:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
+          node-version: 22
+          cache: npm
       - name: Check Snyk token is configured
         id: secrets
         run: |
@@ -43,7 +46,7 @@ jobs:
           fi
       - uses: snyk/actions/setup@master
         if: steps.secrets.outputs.ok == 'true'
-      - run: pip install -r requirements.txt
+      - run: npm ci
         if: steps.secrets.outputs.ok == 'true'
       # Security gate: fail on High or Critical. Each step runs even if a previous one failed.
       - name: SAST (Snyk Code)
@@ -51,7 +54,7 @@ jobs:
         run: snyk code test --severity-threshold=high
       - name: SCA (Snyk Open Source)
         if: always() && steps.secrets.outputs.ok == 'true'
-        run: snyk test --file=requirements.txt --package-manager=pip --command=python3 --severity-threshold=high
+        run: snyk test --severity-threshold=high
       - name: IaC (Snyk IaC)
         if: always() && steps.secrets.outputs.ok == 'true'
         run: snyk iac test k8s --severity-threshold=high

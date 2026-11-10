@@ -1,12 +1,18 @@
-# ✅ FIXED: pinned slim base, non-root user, HEALTHCHECK
-FROM python:3.12-slim
+# ✅ Pinned slim base, multi-stage build, non-root user, HEALTHCHECK
+FROM node:22-alpine AS build
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && useradd --create-home --uid 10001 appuser
-COPY app ./app
-USER appuser
-ENV APP_HOST=0.0.0.0
-EXPOSE 5000
-HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')"
-CMD ["python", "-m", "app.main"]
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
+COPY --from=build --chown=node:node /app/data ./data
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
+CMD ["node", "server.js"]

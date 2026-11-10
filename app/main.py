@@ -1,9 +1,11 @@
 from flask import Flask, jsonify, request
 
 from app.db import get_conn
+from app.tools import tools_bp
 
 app = Flask(__name__)
 conn = get_conn()
+app.register_blueprint(tools_bp)
 
 
 @app.get("/health")

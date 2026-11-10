@@ -16,6 +16,9 @@ describe("api", () => {
 
   it("blocks SQL injection", async () => {
     const res = await users(get("/api/users?name=" + encodeURIComponent("' OR '1'='1")));
-    expect(await res.json()).toEqual([]);
+    expect(
+      await res.json(),
+      "SQL Injection: ส่ง ' OR '1'='1 แล้วต้องไม่ได้ข้อมูลใครเลย แต่ระบบคืน user ออกมา แปลว่า input ถูกต่อเข้า SQL ตรง ๆ",
+    ).toEqual([]);
   });
 });

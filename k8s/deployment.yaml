@@ -20,6 +20,11 @@ spec:
       containers:
         - name: app
           image: poc-app:1.0.0
+          env:
+            # ✅ secret injected from a Kubernetes Secret, not hardcoded
+            - name: WEBHOOK_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: poc-app-secrets, key: webhook-password }
           imagePullPolicy: Always
           ports: [{ containerPort: 3000 }]
           resources:

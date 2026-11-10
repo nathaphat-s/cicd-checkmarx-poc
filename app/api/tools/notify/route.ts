@@ -1,16 +1,16 @@
-// ✅ Only HTTPS to an allow-listed host (prevents SSRF); TLS verification stays on (default fetch)
-const ALLOWED_WEBHOOK_HOSTS = new Set(["hooks.example.com"]);
+// ✅ SSRF prevention: the client picks a webhook by NAME; the URL itself is fixed server-side.
+//    User input is only a lookup key and never becomes part of the request URL.
+const WEBHOOKS: Record<string, string> = {
+  deploy: "https://hooks.example.com/deploy",
+  alerts: "https://hooks.example.com/alerts",
+};
 
 export async function POST(req: Request) {
-  const body = (await req.json().catch(() => ({}))) as { url?: unknown };
-  let url: URL;
-  try {
-    url = new URL(String(body.url ?? ""));
-  } catch {
-    return Response.json({ error: "invalid url" }, { status: 400 });
-  }
-  if (url.protocol !== "https:" || !ALLOWED_WEBHOOK_HOSTS.has(url.hostname)) {
-    return Response.json({ error: "webhook host not allowed" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as { target?: unknown };
+  const target = typeof body.target === "string" ? body.target : "";
+  const url = Object.hasOwn(WEBHOOKS, target) ? WEBHOOKS[target] : undefined;
+  if (!url) {
+    return Response.json({ error: "unknown webhook" }, { status: 400 });
   }
 
   // ✅ Secret comes from the environment / secret manager, never from source code
@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "webhook not configured" }, { status: 503 });
   }
 
+  // ✅ Native fetch keeps TLS verification on; no redirects; timeout
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },

@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.pytest_cache/
+kics-report/
+cx-report/
+.env

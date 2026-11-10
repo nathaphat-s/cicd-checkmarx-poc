@@ -1,0 +1,20 @@
+# ⚠️ Intentional misconfigurations for the KICS demo
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: poc-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: poc-app }
+  template:
+    metadata:
+      labels: { app: poc-app }
+    spec:
+      containers:
+        - name: app
+          image: poc-app:latest
+          ports: [{ containerPort: 5000 }]
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true

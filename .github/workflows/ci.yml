@@ -1,0 +1,75 @@
+name: CI + Checkmarx Security Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write     # PR decoration comment by Checkmarx
+  security-events: write   # upload SARIF to the Security tab
+
+jobs:
+  build-test:
+    name: Build & unit test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -v
+
+  checkmarx:
+    name: Checkmarx One (SAST + SCA + KICS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Checkmarx secrets are configured
+        id: secrets
+        env:
+          CX_CLIENT_ID: ${{ secrets.CX_CLIENT_ID }}
+        run: |
+          if [ -z "$CX_CLIENT_ID" ]; then
+            echo "::warning::CX_* secrets not set. Skipping Checkmarx scan (see README step 3)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkmarx One scan + threshold gate
+        if: steps.secrets.outputs.ok == 'true'
+        uses: checkmarx/ast-github-action@2.3.47
+        with:
+          base_uri: ${{ secrets.CX_BASE_URI }}          # e.g. https://ast.checkmarx.net
+          cx_tenant: ${{ secrets.CX_TENANT }}
+          cx_client_id: ${{ secrets.CX_CLIENT_ID }}
+          cx_client_secret: ${{ secrets.CX_CLIENT_SECRET }}
+          project_name: ${{ github.repository }}
+          # Gate: fail the job if ANY High finding is found (count >= 1)
+          scan_params: >-
+            --scan-types sast,sca,kics
+            --threshold "sast-high=1;sca-high=1;kics-high=1"
+            --report-format sarif,summaryHTML
+            --output-path ./cx-report
+            --output-name cx_result
+
+      - name: Upload SARIF to GitHub Security tab
+        if: always() && steps.secrets.outputs.ok == 'true' && hashFiles('cx-report/cx_result.sarif') != ''
+        continue-on-error: true   # needs GitHub Advanced Security on private repos
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cx-report/cx_result.sarif
+
+      - name: Keep the HTML report as an artifact
+        if: always() && steps.secrets.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkmarx-report
+          path: cx-report/
+          if-no-files-found: ignore

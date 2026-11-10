@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "report": "bash scripts/get-report.sh",
+    "security:local": "bash scripts/security-local.sh"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

@@ -98,6 +98,28 @@ npm test
   ```
 - ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `Build & unit test` และ `Snyk (Code + Open Source + IaC)`
 
+## 4) Report (report.html)
+
+ทุกครั้งที่ pipeline รันเสร็จ จะได้:
+- สรุปผลบนหน้า run ของ Actions (ตาราง + รายการที่ทำให้ gate บล็อก)
+- `report.html` ใน artifact ชื่อ `security-report`
+
+ดึง report ลงเครื่องตัวเอง (ถ้า pipeline ยังรันอยู่ คำสั่งจะรอจนเสร็จแล้วดาวน์โหลดให้เอง):
+
+```bash
+npm run report -- 4
+```
+
+ไม่ใส่เลข PR = ใช้ branch ปัจจุบัน ไฟล์จะอยู่ที่ `reports/pr-4/report.html` แล้วเปิดในเบราว์เซอร์ให้อัตโนมัติ
+
+รันสแกนแบบเดียวกับ CI ในเครื่องก่อน push (ครั้งแรกต้อง `npx snyk auth`):
+
+```bash
+npm run security:local
+```
+
+โฟลเดอร์ `reports/` อยู่ใน `.gitignore` แล้ว report จะไม่ติดไปกับ commit หรือ push
+
 ## เพิ่ม Checkmarx One ภายหลัง
 
 เมื่อได้ tenant แล้ว เพิ่ม job นี้ใน `ci.yml` และใส่ secret `CX_BASE_URI`, `CX_TENANT`, `CX_CLIENT_ID`, `CX_CLIENT_SECRET`:

@@ -9,13 +9,16 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "axios": "0.21.1",
     "better-sqlite3": "13.0.3",
+    "lodash": "4.17.15",
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/lodash": "^4.17.27",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

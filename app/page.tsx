@@ -18,8 +18,9 @@ export default async function Home({
         <button type="submit">ค้นหา</button>
       </form>
       {q && (
-        // ✅ React escapes {q} automatically, so HTML in the query is shown as text
-        <p>ผลการค้นหา: {q}</p>
+        // ⚠️ VULNERABLE (CWE-79 XSS): raw query string injected as HTML
+        // Try: /?q=<img src=x onerror=alert(document.cookie)>
+        <p dangerouslySetInnerHTML={{ __html: "ผลการค้นหา: " + q }} />
       )}
       <ul>
         {users.map((u) => (

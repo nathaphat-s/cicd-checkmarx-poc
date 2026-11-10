@@ -73,3 +73,37 @@ jobs:
           name: checkmarx-report
           path: cx-report/
           if-no-files-found: ignore
+
+  snyk:
+    name: Snyk (Code + Open Source + IaC)
+    runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Snyk token is configured
+        id: secrets
+        run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "::warning::SNYK_TOKEN not set. Skipping Snyk scan."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: snyk/actions/setup@master
+        if: steps.secrets.outputs.ok == 'true'
+      - run: pip install -r requirements.txt
+        if: steps.secrets.outputs.ok == 'true'
+      # Same gate idea as Checkmarx: fail on High or Critical. Each step runs even if a previous one failed.
+      - name: SAST (Snyk Code)
+        if: steps.secrets.outputs.ok == 'true'
+        run: snyk code test --severity-threshold=high
+      - name: SCA (Snyk Open Source)
+        if: always() && steps.secrets.outputs.ok == 'true'
+        run: snyk test --file=requirements.txt --package-manager=pip --command=python3 --severity-threshold=high
+      - name: IaC (Snyk IaC)
+        if: always() && steps.secrets.outputs.ok == 'true'
+        run: snyk iac test k8s --severity-threshold=high

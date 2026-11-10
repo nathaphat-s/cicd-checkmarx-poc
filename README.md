@@ -1,6 +1,6 @@
 # POC: CI/CD + Security Gate (Next.js + Snyk)
 
-แอปตัวอย่าง **Next.js (TypeScript)** สำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk** (SAST + SCA + IaC) และ **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
+แอปตัวอย่าง **Next.js (TypeScript)** สำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk** (SAST + SCA + IaC + Container) และ **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
 
 ```
 push / PR ──► Build & unit test ──┐
@@ -90,13 +90,13 @@ npm test
 
 ## 3) GitHub Actions
 
-- workflow `.github/workflows/ci.yml` มี 2 job คือ `Build & unit test` (npm ci, test, build) และ `Snyk (Code + Open Source + IaC)`
+- workflow `.github/workflows/ci.yml` มี 2 job คือ `Build & unit test` (npm ci, test, build) และ `Snyk (Code + Open Source + IaC + Container)`
 - gate ใช้ `--severity-threshold=high` ในทุกขั้นของ Snyk
 - สั่งรันเองได้ที่ tab Actions → *Run workflow* หรือ:
   ```bash
   gh workflow run ci.yml --ref demo/nextjs-vulnerable
   ```
-- ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `Build & unit test` และ `Snyk (Code + Open Source + IaC)`
+- ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `Build & unit test` และ `Snyk (Code + Open Source + IaC + Container)`
 
 ## 4) Report (report.html)
 

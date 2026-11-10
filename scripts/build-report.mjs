@@ -141,7 +141,12 @@ function parseContainer() {
   let advice = "";
   for (const p of projects) {
     baseImage ||= p.docker?.baseImage ?? "";
-    advice ||= (p.docker?.baseImageRemediation?.advice ?? []).map((a) => a.message).join(" ").replace(/\s+/g, " ").trim();
+    // Turn Snyk's text table into one readable line: current image and suggested alternatives with counts
+    const text = (p.docker?.baseImageRemediation?.advice ?? []).map((a) => a.message).join("\n");
+    const rows = [...text.matchAll(/^(\S+:\S+)\s+(\d+)\s+(\d+ critical, \d+ high)/gm)].map((m) => `${m[1]} (${m[2]} ช่องโหว่: ${m[3]})`);
+    const notes = (p.docker?.baseImageRemediation?.advice ?? []).filter((a) => a.color === "yellow").map((a) => a.message);
+    if (!advice && rows.length) advice = `ตอนนี้ ${rows[0]}${rows.length > 1 ? ` · แนะนำเปลี่ยนเป็น ${rows.slice(1).join(" หรือ ")}` : ""}${notes.length ? ` · ${notes.join(" ")}` : ""}`;
+    else if (!advice && /most secure version/i.test(text)) advice = "ใช้ base image เวอร์ชันที่ปลอดภัยที่สุดอยู่แล้ว";
     for (const v of p.vulnerabilities ?? []) {
       const key = `${v.id}@${v.packageName}@${v.version}`;
       if (seen.has(key)) continue;
@@ -196,7 +201,7 @@ const sections = [
 ];
 const ctr = sections.find((s) => s.key === "container");
 if (ctr.baseImage) ctr.what += ` · base image: ${ctr.baseImage}`;
-if (ctr.advice) ctr.what += ` · คำแนะนำจาก Snyk: ${ctr.advice}`;
+if (ctr.advice) ctr.what += ` · Snyk: ${ctr.advice}`;
 for (const s of sections) {
   s.counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const i of s.items) if (i.severity in s.counts) s.counts[i.severity]++;

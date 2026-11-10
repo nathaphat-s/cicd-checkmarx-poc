@@ -1,8 +1,9 @@
-# ⚠️ Intentional misconfigurations for the KICS demo
+# ✅ FIXED: hardened securityContext, pinned image, resource limits, probes
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: poc-app
+  namespace: poc
 spec:
   replicas: 1
   selector:
@@ -11,10 +12,25 @@ spec:
     metadata:
       labels: { app: poc-app }
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: app
-          image: poc-app:latest
+          image: poc-app:1.0.0
+          imagePullPolicy: Always
           ports: [{ containerPort: 5000 }]
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          livenessProbe:
+            httpGet: { path: /health, port: 5000 }
+          readinessProbe:
+            httpGet: { path: /health, port: 5000 }
           securityContext:
-            privileged: true
-            allowPrivilegeEscalation: true
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }

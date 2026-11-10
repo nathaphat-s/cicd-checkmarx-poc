@@ -14,13 +14,15 @@ def health():
 @app.get("/users")
 def search_users():
     name = request.args.get("name", "")
-    # ⚠️ VULNERABLE (CWE-89 SQL Injection): user input is concatenated into SQL.
-    # Try: /users?name=' OR '1'='1
-    query = "SELECT name, email, role FROM users WHERE name = '" + name + "'"
-    rows = conn.execute(query).fetchall()
+    # ✅ FIXED: parameterized query, input is bound as data, never parsed as SQL.
+    rows = conn.execute(
+        "SELECT name, email, role FROM users WHERE name = ?", (name,)
+    ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
 if __name__ == "__main__":
-    # ⚠️ debug=True + bind 0.0.0.0 is also flagged by SAST
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    import os
+
+    # ✅ FIXED: no debug in code; host/port come from env (container sets APP_HOST=0.0.0.0)
+    app.run(host=os.getenv("APP_HOST", "127.0.0.1"), port=int(os.getenv("APP_PORT", "5000")))

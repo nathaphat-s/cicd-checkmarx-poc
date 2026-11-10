@@ -7,7 +7,7 @@ FAIL=0
 
 echo "== SAST (Semgrep, ERROR severity) =="
 docker run --rm -v "$PWD":/src -w /src semgrep/semgrep:latest semgrep scan \
-  --config p/javascript --config p/typescript --config p/nextjs --config p/react \
+  --config p/owasp-top-ten --config p/nodejsscan --config p/secrets --config p/react \
   --severity ERROR --error --quiet --exclude node_modules --exclude .next || FAIL=1
 
 echo; echo "== SCA (npm audit, high+) =="

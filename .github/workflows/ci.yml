@@ -21,8 +21,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test
+      - name: Unit tests
+        run: npx vitest run --reporter=default --reporter=json --outputFile.json=reports/test-results.json
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-tests
+          path: reports/
+          if-no-files-found: ignore
 
   snyk:
     name: Snyk (Code + Open Source + IaC)
@@ -46,29 +53,54 @@ jobs:
           fi
       - uses: snyk/actions/setup@master
         if: steps.secrets.outputs.ok == 'true'
-      - run: npm ci
+      - run: npm ci && mkdir -p reports
         if: steps.secrets.outputs.ok == 'true'
       # Security gate: fail on High or Critical. Each step runs even if a previous one failed.
+      # The *-file-output flags keep the normal console output and also save results for report.html.
       - name: SAST (Snyk Code)
         if: steps.secrets.outputs.ok == 'true'
-        run: snyk code test --severity-threshold=high
+        run: snyk code test --severity-threshold=high --sarif-file-output=reports/snyk-code.sarif
       - name: SCA (Snyk Open Source)
         if: always() && steps.secrets.outputs.ok == 'true'
-        run: snyk test --severity-threshold=high
+        run: snyk test --severity-threshold=high --json-file-output=reports/snyk-oss.json
       - name: IaC (Snyk IaC)
         if: always() && steps.secrets.outputs.ok == 'true'
-        run: snyk iac test k8s --severity-threshold=high
+        run: snyk iac test k8s --severity-threshold=high --json-file-output=reports/snyk-iac.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-snyk
+          path: reports/
+          if-no-files-found: ignore
 
-  # Posts the overall result as a commit status, so it shows on the PR even when the run
-  # was started manually (workflow_dispatch) instead of by a pull_request event.
-  gate-status:
-    name: Report gate result to PR
+  # Builds one report.html from all results, shows a summary on the run page, and posts the
+  # overall result as a commit status so it appears on the PR (also for workflow_dispatch runs).
+  report:
+    name: Report (HTML + PR status)
     needs: [build-test, snyk]
     if: always()
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       statuses: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: reports
+          merge-multiple: true
+      - name: Build report.html
+        env:
+          BUILD: ${{ needs.build-test.result }}
+          SNYK: ${{ needs.snyk.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: node scripts/build-report.mjs reports report/report.html >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: report/report.html
       - name: Set commit status
         env:
           GH_TOKEN: ${{ github.token }}

@@ -5,3 +5,5 @@ next-env.d.ts
 kics-report/
 semgrep-report/
 .env*
+reports/
+report/

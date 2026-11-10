@@ -17,11 +17,17 @@ echo "== Unit tests"
 npx vitest run --reporter=default --reporter=json --outputFile.json="$OUT/test-results.json"
 BUILD=$([ $? -eq 0 ] && echo success || echo failure)
 
-echo; echo "== Snyk (Code, Open Source, IaC) — gate: High and above"
+echo; echo "== Snyk (Code, Open Source, IaC, Container) — gate: High and above"
 SNYK=success
 npx --yes snyk code test --severity-threshold=high --sarif-file-output="$OUT/snyk-code.sarif" || SNYK=failure
 npx --yes snyk test --severity-threshold=high --json-file-output="$OUT/snyk-oss.json" || SNYK=failure
 npx --yes snyk iac test k8s --severity-threshold=high --json-file-output="$OUT/snyk-iac.json" || SNYK=failure
+if docker build -q -t poc-app:local . >/dev/null; then
+  npx --yes snyk container test poc-app:local --file=Dockerfile --exclude-app-vulns --severity-threshold=high \
+    --json-file-output="$OUT/snyk-container.json" || SNYK=failure
+else
+  echo "Docker build failed (is Docker running?) — container scan skipped"; SNYK=failure
+fi
 
 echo
 BUILD=$BUILD SNYK=$SNYK BRANCH="$(git rev-parse --abbrev-ref HEAD)" SHA="$(git rev-parse HEAD)" \

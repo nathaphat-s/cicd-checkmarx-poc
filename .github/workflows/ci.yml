@@ -32,7 +32,7 @@ jobs:
           if-no-files-found: ignore
 
   snyk:
-    name: Snyk (Code + Open Source + IaC)
+    name: Snyk (Code + Open Source + IaC + Container)
     runs-on: ubuntu-latest
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
@@ -66,6 +66,16 @@ jobs:
       - name: IaC (Snyk IaC)
         if: always() && steps.secrets.outputs.ok == 'true'
         run: snyk iac test k8s --severity-threshold=high --json-file-output=reports/snyk-iac.json
+      - name: Build Docker image
+        id: image
+        if: always() && steps.secrets.outputs.ok == 'true'
+        run: docker build -t poc-app:${{ github.sha }} .
+      - name: Container (Snyk Container)
+        if: always() && steps.secrets.outputs.ok == 'true' && steps.image.outcome == 'success'
+        # --exclude-app-vulns: npm packages are already covered by the SCA step; here we check the image itself
+        run: >-
+          snyk container test poc-app:${{ github.sha }} --file=Dockerfile --exclude-app-vulns
+          --severity-threshold=high --json-file-output=reports/snyk-container.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

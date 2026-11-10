@@ -130,6 +130,40 @@ function parseOss() {
   return { ran: true, items: items.sort(bySeverity) };
 }
 
+// ---------- Snyk Container (JSON) ----------
+function parseContainer() {
+  const data = readJson("snyk-container.json");
+  if (!data) return { ran: false, items: [] };
+  const projects = Array.isArray(data) ? data : [data];
+  const seen = new Set();
+  const items = [];
+  let baseImage = "";
+  let advice = "";
+  for (const p of projects) {
+    baseImage ||= p.docker?.baseImage ?? "";
+    advice ||= (p.docker?.baseImageRemediation?.advice ?? []).map((a) => a.message).join(" ").replace(/\s+/g, " ").trim();
+    for (const v of p.vulnerabilities ?? []) {
+      const key = `${v.id}@${v.packageName}@${v.version}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const ids = (v.identifiers?.CVE ?? []).join(", ");
+      const k = explain(v.title);
+      items.push({
+        severity: v.severity,
+        title: v.title,
+        location: `${v.packageName}@${v.version}`,
+        why: `OS package ${v.packageName}@${v.version} ใน image${baseImage ? ` (base image ${baseImage})` : ""} มีช่องโหว่ที่รู้จักแล้ว${ids ? ` (${ids})` : ""}. ${k.why ?? ""}`,
+        evidence: "",
+        fix: v.nearestFixedInVersion || v.fixedIn?.length
+          ? `อัปเกรด base image เป็นเวอร์ชันใหม่ที่มี ${v.packageName} ${v.nearestFixedInVersion ?? v.fixedIn[0]} ขึ้นไป หรือเปลี่ยนเป็น image ที่เล็กกว่า (เช่น alpine / slim)`
+          : "ยังไม่มีเวอร์ชันที่แก้ พิจารณาเปลี่ยน base image",
+        ref: v.id,
+      });
+    }
+  }
+  return { ran: true, items: items.sort(bySeverity), baseImage, advice };
+}
+
 // ---------- Snyk IaC (JSON) ----------
 function parseIac() {
   const data = readJson("snyk-iac.json");
@@ -158,7 +192,11 @@ const sections = [
   { key: "code", short: "SAST", name: "SAST · Snyk Code", what: "ช่องโหว่ในโค้ดที่เราเขียนเอง", ...parseCode() },
   { key: "oss", short: "SCA", name: "SCA · Snyk Open Source", what: "CVE ใน npm dependency ที่ใช้", ...parseOss() },
   { key: "iac", short: "IaC", name: "IaC · Snyk IaC", what: "การตั้งค่าที่ไม่ปลอดภัยใน Kubernetes manifest", ...parseIac() },
+  { key: "container", short: "Container", name: "Container · Snyk Container", what: "ช่องโหว่ใน Docker image ที่ build จาก Dockerfile (base image และ OS package)", ...parseContainer() },
 ];
+const ctr = sections.find((s) => s.key === "container");
+if (ctr.baseImage) ctr.what += ` · base image: ${ctr.baseImage}`;
+if (ctr.advice) ctr.what += ` · คำแนะนำจาก Snyk: ${ctr.advice}`;
 for (const s of sections) {
   s.counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const i of s.items) if (i.severity in s.counts) s.counts[i.severity]++;

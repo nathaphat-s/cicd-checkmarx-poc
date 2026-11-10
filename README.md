@@ -34,7 +34,7 @@ k8s/, Dockerfile               ไฟล์ IaC ที่ถูกสแกน�
 | XSS | `dangerouslySetInnerHTML={{ __html: q }}` | `<p>{q}</p>` (React escape ให้) |
 | Command Injection | `` exec(`ping -c 1 ${host}`) `` | ตรวจ host + `execFile("ping", ["-c","1",host])` |
 | Path Traversal | `readFile(path.join(DIR, name))` + `text/html` | allow-list ชื่อไฟล์ + `text/plain` |
-| SSRF / TLS | `axios.post(userUrl, …, { rejectUnauthorized: false })` | อนุญาตเฉพาะ HTTPS host ที่กำหนด, ใช้ `fetch` ปกติ |
+| SSRF / TLS | `axios.post(userUrl, …, { rejectUnauthorized: false })` | ให้เลือก webhook จากชื่อ ส่วน URL กำหนดไว้ฝั่ง server, ใช้ `fetch` ปกติ |
 | Hardcoded secret | `const WEBHOOK_PASSWORD = "SuperSecret123!"` | `process.env.WEBHOOK_PASSWORD` + k8s `secretKeyRef` |
 | Dependency เก่า (SCA) | `axios@0.21.1`, `lodash@4.17.15` | ไม่ใช้ / ใช้ `fetch` ที่มากับ Node |
 | IaC | k8s `hostNetwork`, `hostPID`, secret เป็น plain text | securityContext แบบ hardened |

@@ -35,8 +35,8 @@ describe("/api/tools/ping", () => {
 
   it("blocks command injection", async () => {
     const res = await ping(get("/api/tools/ping?host=" + encodeURIComponent("127.0.0.1; cat /etc/passwd")));
-    expect(res.status).toBe(400);
-    expect(calls).toHaveLength(0);
+    expect(res.status, "Command Injection: host ที่มี ; ต้องถูกปฏิเสธ (400) แต่ระบบรับไว้ แปลว่า input ถูกส่งเข้า shell ได้").toBe(400);
+    expect(calls, "Command Injection: ต้องไม่มีคำสั่งถูกรันเลยเมื่อ host ไม่ถูกต้อง").toHaveLength(0);
   });
 });
 
@@ -49,7 +49,7 @@ describe("/api/tools/files", () => {
 
   it("blocks path traversal", async () => {
     const res = await files(get("/api/tools/files?name=" + encodeURIComponent("../../package.json")));
-    expect([400, 404]).toContain(res.status);
+    expect([400, 404], "Path Traversal: ../../package.json ต้องถูกปฏิเสธ (400/404) แต่ระบบอ่านไฟล์นอกโฟลเดอร์ให้ได้").toContain(res.status);
   });
 });
 
@@ -59,7 +59,8 @@ describe("/api/tools/notify", () => {
       method: "POST",
       body: JSON.stringify({ url: "http://169.254.169.254/latest/meta-data" }),
     });
-    const res = await notify(req);
-    expect(res.status).toBe(400);
+    // If the route tries to call the URL it throws (no network in tests): treat that as "request was sent"
+    const res = await notify(req).catch(() => new Response("request was sent", { status: 500 }));
+    expect(res.status, "SSRF: URL ภายใน (169.254.169.254) ต้องถูกปฏิเสธ (400) ก่อนยิง แต่ระบบพยายามยิง request ไปจริง").toBe(400);
   });
 });

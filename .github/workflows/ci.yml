@@ -58,3 +58,28 @@ jobs:
       - name: IaC (Snyk IaC)
         if: always() && steps.secrets.outputs.ok == 'true'
         run: snyk iac test k8s --severity-threshold=high
+
+  # Posts the overall result as a commit status, so it shows on the PR even when the run
+  # was started manually (workflow_dispatch) instead of by a pull_request event.
+  gate-status:
+    name: Report gate result to PR
+    needs: [build-test, snyk]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      statuses: write
+    steps:
+      - name: Set commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD: ${{ needs.build-test.result }}
+          SNYK: ${{ needs.snyk.result }}
+        run: |
+          if [ "$BUILD" = success ] && [ "$SNYK" = success ]; then
+            state=success; desc="Tests and Snyk security gate passed"
+          else
+            state=failure; desc="Blocked: build-test=$BUILD, snyk=$SNYK"
+          fi
+          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+            -f state="$state" -f context="CI + Security Gate" -f description="$desc" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -1,0 +1,23 @@
+# Dependabot (part of GitHub Advanced Security, free on public repos)
+# - Dependabot alerts: turn on in Settings → Code security → Dependabot alerts (lists CVEs on main)
+# - Dependabot security updates: opens a fix PR for each alert (same setting page)
+# - This file: version updates, i.e. weekly PRs that keep dependencies current even without a CVE
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for all minor/patch bumps instead of one PR per package
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

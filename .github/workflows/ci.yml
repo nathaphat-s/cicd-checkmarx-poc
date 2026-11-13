@@ -34,6 +34,8 @@ jobs:
   snyk:
     name: Snyk (Code + Open Source + IaC + Container)
     runs-on: ubuntu-latest
+    outputs:
+      ran: ${{ steps.secrets.outputs.ok }}
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
@@ -83,16 +85,152 @@ jobs:
           path: reports/
           if-no-files-found: ignore
 
+  # Aikido local scanner: the scan runs inside this runner (source code is not uploaded), only results go to Aikido.
+  # One "scan" covers SAST + dependencies + IaC + secrets; "image-scan" covers the Docker image.
+  # PR gating mode reports only issues that are NEW compared to main (the merge-base), like a PR check.
+  aikido:
+    name: Aikido (SAST + SCA + IaC + Secrets + Container)
+    runs-on: ubuntu-latest
+    outputs:
+      ran: ${{ steps.secrets.outputs.ok }}
+    env:
+      AIKIDO_API_KEY: ${{ secrets.AIKIDO_API_KEY }}
+      SCANNER: aikidosecurity/local-scanner:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # PR gating compares the base and head commits
+      - name: Check Aikido token is configured
+        id: secrets
+        run: |
+          if [ -z "$AIKIDO_API_KEY" ]; then
+            echo "::warning::AIKIDO_API_KEY not set. Skipping Aikido scan."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Pick gating mode
+        id: mode
+        if: steps.secrets.outputs.ok == 'true'
+        run: |
+          mkdir -p reports
+          BASE="$(git merge-base origin/main HEAD)"
+          # On main itself there is nothing to diff against, so gate on all open issues (release mode)
+          if [ "$BASE" = "$GITHUB_SHA" ]; then
+            echo "args=--gating-mode release" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=--gating-mode pr --base-commit-id $BASE --head-commit-id $GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          fi
+      # Branch names come from the PR author, so they are passed as env vars, never pasted into the script
+      - name: Code (SAST + SCA + IaC + Secrets)
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          MODE_ARGS: ${{ steps.mode.outputs.args }}
+        run: >-
+          docker run --rm -v "$PWD":/src -w /src -e AIKIDO_API_KEY --entrypoint aikido-local-scanner "$SCANNER"
+          scan /src --repositoryname "$REPO_NAME" --branchname "$BRANCH"
+          $MODE_ARGS --fail-on high --exclude node_modules --exclude .next
+          --gating-result-output /src/reports/aikido-code.json
+      - name: Build Docker image
+        id: image
+        if: always() && steps.secrets.outputs.ok == 'true'
+        run: docker build -t poc-app:${{ github.sha }} .
+      - name: Container (Aikido image scan)
+        if: always() && steps.secrets.outputs.ok == 'true' && steps.image.outcome == 'success'
+        # Free plan allows 2 images: always report under the same image name (tag = branch) so branches do not use up the quota
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          MODE_ARGS: ${{ steps.mode.outputs.args }}
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/reports":/out -e AIKIDO_API_KEY
+          --entrypoint aikido-local-scanner "$SCANNER"
+          image-scan "poc-app:$GITHUB_SHA" --image-name poc-app --tag "${BRANCH//\//-}"
+          --linked-repository-name "$REPO_NAME"
+          $MODE_ARGS --fail-on high --gating-result-output /out/aikido-container.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-aikido
+          path: reports/
+          if-no-files-found: ignore
+
+  # GitHub Advanced Security (free on public repos): CodeQL = SAST, Dependency Review = SCA.
+  # Secret scanning + push protection are repo settings, not a job: they block a push that contains a
+  # known token format and list findings in the Security tab. Dependabot is configured in .github/dependabot.yml.
+  ghas:
+    name: GHAS (CodeQL + Dependency Review)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload CodeQL results to the Security tab
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find base commit
+        id: base
+        run: |
+          mkdir -p reports
+          echo "sha=$(git merge-base origin/main HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: SAST (CodeQL)
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript
+          output: codeql-results
+      - name: CodeQL gate (High and above)
+        # CodeQL only reports; this step fails the job when an alert has security-severity >= 7.0
+        run: |
+          cp codeql-results/*.sarif reports/ghas-codeql.sarif
+          node scripts/gate-count.mjs codeql reports/ghas-codeql.sarif
+      # Dependency Review compares two commits, so it is skipped on main itself (base == head)
+      - name: SCA (Dependency Review)
+        id: deps
+        if: always() && steps.base.outputs.sha != github.sha
+        uses: actions/dependency-review-action@v4
+        with:
+          base-ref: ${{ steps.base.outputs.sha }}
+          head-ref: ${{ github.sha }}
+          fail-on-severity: high
+          comment-summary-in-pr: never
+      - name: Save Dependency Review result
+        if: always() && steps.base.outputs.sha != github.sha
+        env:
+          CHANGES: ${{ steps.deps.outputs.vulnerable-changes }}
+        run: printf '%s' "${CHANGES:-[]}" > reports/ghas-dependency-review.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-ghas
+          path: reports/
+          if-no-files-found: ignore
+
   # Builds one report.html from all results, shows a summary on the run page, and posts the
-  # overall result as a commit status so it appears on the PR (also for workflow_dispatch runs).
+  # results as commit statuses so they appear on the PR (also for workflow_dispatch runs).
   report:
     name: Report (HTML + PR status)
-    needs: [build-test, snyk]
+    needs: [build-test, snyk, aikido, ghas]
     if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: read
       statuses: write
+    env:
+      BUILD: ${{ needs.build-test.result }}
+      SNYK: ${{ needs.snyk.result }}
+      AIKIDO: ${{ needs.aikido.result }}
+      GHAS: ${{ needs.ghas.result }}
+      # Which scanners block the merge (the others are shown for comparison only).
+      # Change without editing this file:  gh variable set GATE_TOOLS --body "snyk aikido ghas"
+      GATE_TOOLS: ${{ vars.GATE_TOOLS || 'snyk' }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -101,29 +239,42 @@ jobs:
           merge-multiple: true
       - name: Build report.html
         env:
-          BUILD: ${{ needs.build-test.result }}
-          SNYK: ${{ needs.snyk.result }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          BRANCH: ${{ github.ref_name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
           SHA: ${{ github.sha }}
         run: node scripts/build-report.mjs reports report/report.html >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: security-report
           path: report/report.html
-      - name: Set commit status
+      - name: Set commit statuses
         env:
           GH_TOKEN: ${{ github.token }}
-          BUILD: ${{ needs.build-test.result }}
-          SNYK: ${{ needs.snyk.result }}
+          SNYK_RAN: ${{ needs.snyk.outputs.ran }}
+          AIKIDO_RAN: ${{ needs.aikido.outputs.ran }}
         run: |
-          if [ "$BUILD" = success ] && [ "$SNYK" = success ]; then
-            state=success; desc="Tests and Snyk security gate passed"
-          else
-            state=failure; desc="Blocked: build-test=$BUILD, snyk=$SNYK"
-          fi
-          gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -f state="$state" -f context="CI + Security Gate" -f description="$desc" \
-            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          status() {
+            gh api "repos/${{ github.repository }}/statuses/${{ github.sha }}" \
+              -f state="$1" -f context="$2" -f description="$3" -f target_url="$RUN_URL" > /dev/null
+          }
+          result_of() {
+            case "$1" in snyk) echo "$SNYK" ;; aikido) echo "$AIKIDO" ;; ghas) echo "$GHAS" ;; *) echo unknown ;; esac
+          }
+          # One status per scanner, so the PR shows the three results side by side
+          for t in snyk aikido ghas; do
+            r="$(result_of "$t")"
+            if [ "$r" = success ]; then st=success; else st=failure; fi
+            if { [ "$t" = snyk ] && [ "$SNYK_RAN" = false ]; } || { [ "$t" = aikido ] && [ "$AIKIDO_RAN" = false ]; }; then
+              r="skipped, token not set"
+            fi
+            status "$st" "Scanner / $t" "$t job: $r"
+          done
+          # Overall gate = unit tests + the scanners listed in GATE_TOOLS
+          state=success; desc="Tests and security gate ($GATE_TOOLS) passed"
+          if [ "$BUILD" != success ]; then state=failure; desc="Blocked: build-test=$BUILD"; fi
+          for t in $GATE_TOOLS; do
+            r="$(result_of "$t")"
+            if [ "$r" != success ]; then state=failure; desc="Blocked: build-test=$BUILD, $t=$r"; fi
+          done
+          status "$state" "CI + Security Gate" "$desc"
           # Fail this job too when the gate is blocked, so it is red in the Actions UI
           [ "$state" = success ]

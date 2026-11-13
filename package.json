@@ -8,7 +8,8 @@
     "start": "next start",
     "test": "vitest run",
     "report": "bash scripts/get-report.sh",
-    "security:local": "bash scripts/security-local.sh"
+    "security:local": "bash scripts/security-local.sh",
+    "ghas:alerts": "bash scripts/ghas-alerts.sh"
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",

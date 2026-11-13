@@ -1,12 +1,15 @@
-# POC: CI/CD + Security Gate (Next.js + Snyk)
+# POC: CI/CD + Security Gate (Next.js + Snyk · Aikido · GitHub Advanced Security)
 
-แอปตัวอย่าง **Next.js (TypeScript)** สำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk** (SAST + SCA + IaC + Container) และ **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
+แอปตัวอย่าง **Next.js (TypeScript)** สำหรับสาธิต pipeline บน **GitHub Actions** ที่สแกนโค้ดด้วย **Snyk**, **Aikido** และ **GitHub Advanced Security** คู่กันบนโค้ดชุดเดียว แล้ว **บล็อกอัตโนมัติ** เมื่อพบช่องโหว่ระดับ High ขึ้นไป
 
 ```
 push / PR ──► Build & unit test ──┐
-          └─► Snyk ───────────────┴─► Gate (High ขึ้นไป = fail) ──► merge ได้ / ถูกบล็อก
-              Code | Open Source | IaC
+          ├─► Snyk ───────────────┤
+          ├─► Aikido ─────────────┼─► Report (เทียบ 3 tool) ─► Gate (High ขึ้นไป = fail) ─► merge ได้ / ถูกบล็อก
+          └─► GHAS (CodeQL + Dependency Review)
 ```
+
+ตารางเทียบความสามารถ, วิธีตั้งค่า Aikido / GHAS และตารางผลบน PR เดโม อยู่ใน [docs/tool-comparison.md](docs/tool-comparison.md)
 
 ## โครงสร้าง
 
@@ -88,21 +91,29 @@ npm test
 
 ถ้าไม่ได้ใส่ `SNYK_TOKEN` job Snyk ใน Actions จะข้ามพร้อม warning
 
-## 3) GitHub Actions
+## 3) Aikido และ GitHub Advanced Security
 
-- workflow `.github/workflows/ci.yml` มี 2 job คือ `Build & unit test` (npm ci, test, build) และ `Snyk (Code + Open Source + IaC + Container)`
-- gate ใช้ `--severity-threshold=high` ในทุกขั้นของ Snyk
+- **Aikido**: สมัคร https://app.aikido.dev ด้วย GitHub, เลือก repo นี้, สร้าง token ที่ Settings → Integrations → Local scanner แล้ว `gh secret set AIKIDO_API_KEY` (ไม่ใส่ = job ข้ามพร้อม warning)
+- **GHAS**: repo เป็น public จึงใช้ได้ฟรี CodeQL และ Dependency Review รันใน workflow เลย, Secret scanning + push protection เปิดอยู่แล้ว, ควรเปิด Dependabot alerts ที่ Settings → Code security
+- ดู alert ของ Dependabot / Secret scanning (workflow อ่านไม่ได้): `npm run ghas:alerts`
+- รายละเอียดและข้อจำกัดของแผนฟรี: [docs/tool-comparison.md](docs/tool-comparison.md)
+
+## 4) GitHub Actions
+
+- workflow `.github/workflows/ci.yml` มี job `Build & unit test`, `Snyk (...)`, `Aikido (...)`, `GHAS (CodeQL + Dependency Review)` และ `Report`
+- ทุก tool ใช้เกณฑ์ High ขึ้นไป (Snyk `--severity-threshold=high`, Aikido `--fail-on high`, CodeQL `security-severity >= 7.0`, Dependency Review `fail-on-severity: high`)
+- gate ที่บล็อก merge (`CI + Security Gate`) = unit tests + Snyk เป็นค่าเริ่มต้น เพิ่ม tool อื่นได้ด้วย `gh variable set GATE_TOOLS --body "snyk aikido ghas"` และบน PR จะเห็น status แยก `Scanner / snyk`, `Scanner / aikido`, `Scanner / ghas`
 - สั่งรันเองได้ที่ tab Actions → *Run workflow* หรือ:
   ```bash
   gh workflow run ci.yml --ref demo/nextjs-vulnerable
   ```
-- ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `Build & unit test` และ `Snyk (Code + Open Source + IaC + Container)`
+- ให้ gate บล็อกการ merge จริง: Settings → Branches → Branch protection ของ `main` → *Require status checks* เลือก `CI + Security Gate`
 
-## 4) Report (report.html)
+## 5) Report (report.html)
 
 ทุกครั้งที่ pipeline รันเสร็จ จะได้:
 - สรุปผลบนหน้า run ของ Actions (ตาราง + รายการที่ทำให้ gate บล็อก)
-- `report.html` ใน artifact ชื่อ `security-report`
+- `report.html` ใน artifact ชื่อ `security-report` หน้าแรกเป็นตารางเทียบ Snyk · Aikido · GHAS ต่อประเภทการสแกน (SAST, SCA, IaC, Secrets, Container)
 
 ดึง report ลงเครื่องตัวเอง (ถ้า pipeline ยังรันอยู่ คำสั่งจะรอจนเสร็จแล้วดาวน์โหลดให้เอง):
 
@@ -112,7 +123,7 @@ npm run report -- 4
 
 ไม่ใส่เลข PR = ใช้ branch ปัจจุบัน ไฟล์จะอยู่ที่ `reports/pr-4/report.html` แล้วเปิดในเบราว์เซอร์ให้อัตโนมัติ
 
-รันสแกนแบบเดียวกับ CI ในเครื่องก่อน push (ครั้งแรกต้อง `npx snyk auth`):
+รันสแกนแบบเดียวกับ CI ในเครื่องก่อน push (Snyk รันเมื่อ `npx snyk auth` แล้ว, Aikido รันเมื่อ `export AIKIDO_API_KEY=...`, CodeQL รันบน Actions เท่านั้น):
 
 ```bash
 npm run security:local

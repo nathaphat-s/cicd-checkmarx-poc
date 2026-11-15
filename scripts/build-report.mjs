@@ -36,12 +36,12 @@ const GATE_TOOLS = new Set((env.GATE_TOOLS ?? "snyk").split(/[\s,]+/).filter(Boo
 const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-// Comparison columns. A section covers one or more adjacent columns (Aikido's code scan covers four).
+// Comparison columns ("leak" = secrets detection). A section covers one or more adjacent columns (Aikido's code scan covers four).
 const CATS = [
   { id: "sast", name: "SAST" },
   { id: "sca", name: "SCA" },
   { id: "iac", name: "IaC" },
-  { id: "secrets", name: "Secrets" },
+  { id: "leak", name: "Secrets" },
   { id: "container", name: "Container" },
 ];
 
@@ -67,14 +67,14 @@ const TOOLS = [
         ...snykContainer,
       },
     ],
-    notes: { secrets: "รวมใน Snyk Code" },
+    notes: { leak: "รวมใน Snyk Code" },
   },
   {
     id: "aikido",
     name: "Aikido",
     job: env.AIKIDO,
     sections: [
-      { key: "aikido-code", cats: ["sast", "sca", "iac", "secrets"], short: "Code", name: "Aikido local scanner (code)", what: "สแกนครั้งเดียวได้ SAST + dependency + IaC + secrets (ผลรวมเป็นรายการเดียว)", ...parseAikido(read, "aikido-code.json") },
+      { key: "aikido-code", cats: ["sast", "sca", "iac", "leak"], short: "Code", name: "Aikido local scanner (code)", what: "สแกนครั้งเดียวได้ SAST + dependency + IaC + secrets (ผลรวมเป็นรายการเดียว)", ...parseAikido(read, "aikido-code.json") },
       { key: "aikido-container", cats: ["container"], short: "Container", name: "Aikido image scan", what: "ช่องโหว่ใน Docker image (OS package และ base image)", ...parseAikido(read, "aikido-container.json") },
     ],
     notes: {},
@@ -89,7 +89,7 @@ const TOOLS = [
     ],
     notes: {
       iac: "ไม่รองรับ",
-      secrets: "Secret scanning + push protection (บล็อกตอน push, ดูใน Security tab)",
+      leak: "Secret scanning + push protection (บล็อกตอน push, ดูใน Security tab)",
       container: "ไม่รองรับ",
     },
   },
@@ -168,7 +168,7 @@ for (const { tool, cells } of matrixRows) {
 md.push("", `Unit tests: ${icon[testStatus]} ${tests.ran ? `${tests.items.length - tests.failed.length}/${tests.items.length} passed` : "not run"} · 🔒 = ใช้บล็อก merge`);
 if (blockers.length) {
   md.push("", "### รายการระดับ Critical/High", "", "| ประเภท | ปัญหา | ที่ไหน | สาเหตุ |", "|---|---|---|---|");
-  const cell = (s) => String(s ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const cell = (s) => String(s ?? "").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
   // Keep the run page readable: at most 8 rows per tool, the full list is in report.html
   const shown = {};
   for (const b of blockers) {

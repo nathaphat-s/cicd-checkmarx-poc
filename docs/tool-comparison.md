@@ -113,23 +113,35 @@ npm run ghas:alerts -- demo/nextjs-vulnerable
    ```
 4. กรอกตารางผลด้านล่าง
 
-### ตารางผล (กรอกหลังรันจริง)
+### ตารางผล (รันจริง 15 พ.ย. 2026)
 
-ช่องโหว่ที่ตั้งใจใส่ไว้ใน PR #4 และใครจับได้ (✅ = รายงานระดับ High ขึ้นไป, 🟡 = รายงานแต่ต่ำกว่า High, ❌ = ไม่รายงาน)
+ช่องโหว่ที่ตั้งใจใส่ไว้ (โค้ดชุดเดียวกันใน #4 Snyk, #7 Aikido, #9 GHAS) และใครจับได้
+(✅ = รายงานระดับ High ขึ้นไป, 🟡 = รายงานแต่ต่ำกว่า High, ❌ = ไม่รายงาน, ⏳ = ยังไม่ได้ผล)
 
-| ช่องโหว่ | ไฟล์ | Unit test | Snyk | Aikido | GHAS |
+| ช่องโหว่ | ไฟล์ | Unit test | Snyk (#4) | Aikido (#7) | GHAS / CodeQL (#9) |
 |---|---|---|---|---|---|
-| SQL Injection | `lib/users.ts` | ✅ | ❌ | | |
-| XSS (reflected) | `app/page.tsx` | | | | |
-| DOM XSS / postMessage eval | `app/welcome/WelcomeClient.tsx` | | ✅ | | |
-| Command Injection | `app/api/tools/ping` | ✅ | ✅ | | |
-| Path Traversal | `app/api/tools/files` | ✅ | ✅ | | |
-| SSRF + ปิด TLS | `app/api/tools/notify` | ✅ | ✅ | | |
-| Code Injection (eval) | `app/api/calc` | | ✅ | | |
-| Open Redirect | `app/api/go` | | | | |
-| Hardcoded password | `app/api/tools/notify` | | | | |
-| axios 0.21.1 / lodash 4.17.15 | `package.json` | | ✅ | | |
-| k8s hostNetwork / hostPID | `k8s/deployment.yaml` | | 🟡 | | ไม่รองรับ |
-| base image bullseye, root | `Dockerfile` | | ✅ | | ไม่รองรับ |
+| SQL Injection | `lib/users.ts` | ✅ | ❌ | ✅ Critical | ✅ High |
+| XSS (`dangerouslySetInnerHTML`) | `app/page.tsx` | | ❌ | ✅ High | ❌ |
+| DOM XSS (`innerHTML`) | `app/welcome/WelcomeClient.tsx` | | ✅ | ✅ High | ✅ High |
+| postMessage → `eval` | `app/welcome/WelcomeClient.tsx` | | ❌ | ✅ Critical | ✅ Critical |
+| Client open redirect (`location.href`) | `app/welcome/WelcomeClient.tsx` | | ❌ | ✅ High (เป็น XSS) | ✅ High (เป็น XSS) + 🟡 redirect |
+| Command Injection | `app/api/tools/ping` | ✅ | ✅ | ❌ | ✅ Critical |
+| Path Traversal | `app/api/tools/files` | ✅ | ✅ | ✅ High | ❌ |
+| SSRF | `app/api/tools/notify` | ✅ | ✅ | 🟡 Medium | ✅ Critical |
+| ปิด TLS (`rejectUnauthorized: false`) | `app/api/tools/notify` | | ❌ | ❌ | ✅ High |
+| Code Injection (`eval`) | `app/api/calc` | | ✅ | ✅ Critical | ✅ Critical |
+| Server open redirect | `app/api/go` | | ❌ | ✅ Critical | ❌ |
+| Hardcoded password | `app/api/tools/notify` | | ❌ | ❌ | ❌ |
+| axios 0.21.1 / lodash 4.17.15 | `package.json` | | ✅ 16 | ✅ 14 (Critical 1, High 7) | ⏳ ต้องเปิด Dependency graph |
+| k8s hostNetwork / hostPID | `k8s/deployment.yaml` | | 🟡 | ❌ | ไม่รองรับ |
+| base image bullseye, root | `Dockerfile` | | ✅ 31 CVE | 🟡 root user (Medium) ไม่ได้สแกน image | ไม่รองรับ |
+| **รวมที่จับได้ระดับ High ขึ้นไป (โค้ด 12 จุด)** | | 4 | 5 | 8 | 8 |
 
-PR #5 (secure) ควรผ่านทุก tool ถ้า tool ไหน fail บน PR #5 = false positive ให้จดไว้ด้วย
+ฝั่ง secure ทุก tool ผ่าน: Snyk #5 ผ่าน, Aikido #8 ผ่าน (เจอ Low 1), CodeQL #10 ผ่าน (เจอ Medium 1 เป็น client-side URL redirect)
+
+**ข้อสังเกต**
+- Aikido ใช้ PR check ของ GitHub App (ไม่ใช่ local scanner ใน CI) ค่าเริ่มต้นจะ fail เมื่อเจอ **Critical** เท่านั้น ถ้าจะให้เทียบกับ Snyk/CodeQL แบบยุติธรรม ควรตั้งให้ fail ที่ High ใน dashboard
+- Aikido แสดงผลเป็น comment บนบรรทัดโค้ดใน PR พร้อมปุ่ม "Show fix" ส่วน Deep Review ถูกข้าม เพราะแผนฟรีไม่มีเครดิต AI
+- CodeQL จับ command injection, SSRF และ TLS ได้แม่นที่สุด แต่ไม่จับ path traversal กับ `dangerouslySetInnerHTML` ในโค้ดนี้
+- Aikido จับ open redirect, path traversal และ SQLi ได้ แต่พลาด command injection (`exec`) และไม่สแกน k8s / container image ใน PR check
+- ไม่มี tool ไหนจับ hardcoded password `"SuperSecret123!"` ได้ที่ระดับ High

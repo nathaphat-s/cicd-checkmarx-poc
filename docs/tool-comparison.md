@@ -43,6 +43,12 @@ push / PR / Run workflow
 
 ## ตั้งค่า Aikido
 
+> **ใช้แบบไหนใน POC นี้:** แผนฟรีใช้ **PR check ผ่าน Aikido GitHub App** (ผลอยู่ใน #7/#8) ส่วน local scanner ใน CI (job `aikido` ใน ci.yml) **ต้องใช้แผนเสียเงิน** (ตรวจกับบัญชีจริงแล้ว 15 พ.ย. 2026) job นี้จึงถูกข้ามเพราะไม่มี `AIKIDO_API_KEY` และเก็บไว้ใช้เมื่อซื้อแผน
+
+**แบบ GitHub App (แผนฟรี):** เชื่อม repo ใน dashboard แล้วเปิด PR checks ทุก PR จะได้ check `Aikido Security: check code` พร้อม comment บนบรรทัดโค้ด (ค่าเริ่มต้นจะ fail ที่ Critical ปรับเป็น High ได้ใน dashboard) ผลจะไม่เข้า report.html
+
+**แบบ local scanner ใน CI (แผนเสียเงิน):**
+
 1. สมัคร https://app.aikido.dev ด้วยบัญชี GitHub (แผน Free: 2 users, 10 repos, 2 container images, rescan อัตโนมัติทุก 3 วัน, ไม่มี AutoTriage)
 2. เลือก repo `cicd-checkmarx-poc` ให้ Aikido เข้าถึง (ได้ dashboard และสแกนรอบแรกทันที)
 3. สร้าง token สำหรับ local scanner: Settings → Integrations → **Local scanner** (ขึ้นต้นด้วย `AIK_CI_`) แล้วรัน:
@@ -54,7 +60,8 @@ push / PR / Run workflow
 ถ้าไม่ได้ใส่ `AIKIDO_API_KEY` job Aikido จะข้ามพร้อม warning และ report แสดงเป็น NOT RUN
 
 **ข้อควรระวังของแผน Free**
-- เอกสารของ Aikido ระบุว่า PR gating แบบเขียนใน CI (in-code) ต้องใช้แผน Pro ส่วน local scanner ไม่ได้ระบุแผน ถ้า job ขึ้น error เรื่อง plan/permission ให้ใช้ **PR gating ผ่าน Aikido dashboard** แทน (Settings → PR Checks เปิดสำหรับ repo นี้) ซึ่งจะได้ check `Aikido Security` บน PR โดยไม่ต้องใช้ CI (แต่ผลจะไม่เข้า report.html)
+- local scanner และ PR gating แบบเขียนใน CI ต้องใช้แผนเสียเงิน แผนฟรีใช้ได้แค่ PR check ผ่าน GitHub App
+- AutoFix ทำงานกับ issue บน `main` และเปิด PR ใหม่ให้ (ใช้ได้ระหว่าง Pro trial) ส่วนใน PR ที่ยังไม่ merge จะได้แค่ suggested change ใน comment
 - image-scan ใช้ชื่อ image เดียว (`poc-app`) และแยกด้วย tag เพื่อไม่ให้เกินโควตา 2 images
 - ไฟล์ผลของ `--gating-result-output` ไม่มี schema ในเอกสาร parser ใน `scripts/parsers.mjs` อ่านแบบยืดหยุ่น ถ้าได้ไฟล์จริงแล้วชื่อ field ไม่ตรง ให้ปรับที่ฟังก์ชัน `parseAikido`
 

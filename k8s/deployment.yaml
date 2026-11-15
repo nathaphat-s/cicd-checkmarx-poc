@@ -13,6 +13,9 @@ spec:
       labels: { app: poc-app }
     spec:
       automountServiceAccountToken: false
+      # ⚠️ shares the node's network and PID namespaces
+      hostNetwork: true
+      hostPID: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -20,6 +23,10 @@ spec:
       containers:
         - name: app
           image: poc-app:1.0.0
+          env:
+            # ⚠️ secret in plain text in the manifest
+            - name: WEBHOOK_PASSWORD
+              value: "SuperSecret123!"
           imagePullPolicy: Always
           ports: [{ containerPort: 3000 }]
           resources:

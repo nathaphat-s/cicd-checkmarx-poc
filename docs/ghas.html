@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GHAS POC Walkthrough</title>
+<style>
+:root{--bg:#f6f6f8;--panel:#fff;--text:#18181b;--muted:#6b7280;--border:#e4e4e7;--accent:#6551f3;--accent-bg:#efedfe;
+--pass:#15803d;--pass-bg:#ecfdf3;--fail:#b91c1c;--fail-bg:#fef2f2;--warn:#b45309;--warn-bg:#fffbeb;
+--crit:#7f1d1d;--high:#dc2626;--med:#d97706;--low:#6b7280;--code-bg:#f4f4f5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0f12;--panel:#18181c;--text:#f4f4f5;--muted:#a1a1aa;--border:#2e2e35;--accent:#a99cff;--accent-bg:#221f3d;
+--pass:#4ade80;--pass-bg:#0f2418;--fail:#f87171;--fail-bg:#2a1215;--warn:#fbbf24;--warn-bg:#2a2010;--code-bg:#232329}}
+:root[data-theme="dark"]{--bg:#0f0f12;--panel:#18181c;--text:#f4f4f5;--muted:#a1a1aa;--border:#2e2e35;--accent:#a99cff;--accent-bg:#221f3d;
+--pass:#4ade80;--pass-bg:#0f2418;--fail:#f87171;--fail-bg:#2a1215;--warn:#fbbf24;--warn-bg:#2a2010;--code-bg:#232329}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans Thai",sans-serif}
+main{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+header h1{font-size:28px;line-height:1.25;margin:0 0 6px}
+header p{margin:0;color:var(--muted)}
+h2{font-size:21px;margin:44px 0 10px;padding-top:8px;border-top:1px solid var(--border)}
+h3{font-size:16px;margin:22px 0 6px}
+a{color:var(--accent)}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:12px 0}
+.tldr{border-left:5px solid var(--accent)}
+.tldr ul{margin:6px 0 0;padding-left:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .n{font-size:30px;font-weight:700;line-height:1.1}.kpi .l{font-size:13px;color:var(--muted)}
+.kpi.fail .n{color:var(--fail)}.kpi.pass .n{color:var(--pass)}
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 22px 52px}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+ol.steps>li::after{content:"";position:absolute;left:16px;top:38px;bottom:4px;width:2px;background:var(--border)}
+ol.steps>li:last-child::after{display:none}
+ol.steps h3{margin:4px 0 4px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;vertical-align:middle;margin-left:6px}
+.tag.ok{background:var(--pass-bg);color:var(--pass)}.tag.no{background:var(--fail-bg);color:var(--fail)}.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin:10px 0}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--panel)}
+tr:last-child td{border-bottom:0}
+td.c{text-align:center;white-space:nowrap}
+.sev{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:4px;color:#fff;white-space:nowrap}
+.sev.critical{background:var(--crit)}.sev.high{background:var(--high)}.sev.medium{background:var(--med)}.sev.low{background:var(--low)}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code-bg);padding:1px 5px;border-radius:4px;word-break:break-word}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:8px 0}
+pre code{background:none;padding:0}
+.del{color:var(--fail)}.add{color:var(--pass)}
+figure{margin:10px 0}figure img{width:100%;border:1px solid var(--border);border-radius:10px;display:block}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.callout{border-radius:10px;padding:12px 14px;margin:10px 0}
+.callout.warn{background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.callout.info{background:var(--accent-bg);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){.two{grid-template-columns:1fr}header h1{font-size:23px}ol.steps>li{padding-left:44px}}
+.mock{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px}
+.mock .who{font-weight:600}.mock .who span{color:var(--muted);font-weight:400}
+nav.toc{font-size:14px}nav.toc a{text-decoration:none}nav.toc ol{margin:4px 0 0;padding-left:20px;columns:2}
+@media (max-width:720px){nav.toc ol{columns:1}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>GitHub Advanced Security ใน POC CI/CD: เริ่มใช้งานจนถึงผลสแกนจริง</h1>
+  <p>repo <code>nathaphat-s/cicd-checkmarx-poc</code> · ทดลองเมื่อ 13–16 พ.ย. 2026 · โค้ดชุดเดียวกับ PR เดโมของ Snyk (#4/#5) และ Aikido (#7/#8)</p>
+</header>
+
+<div class="card tldr">
+  <strong>สรุปสั้น</strong>
+  <ul>
+    <li>repo นี้เป็น <b>public</b> จึงใช้ GHAS ได้ <b>ฟรีทุกฟีเจอร์</b> (repo private ต้องซื้อ GitHub Code Security / Secret Protection คิดต่อ active committer)</li>
+    <li>ใช้ 4 ส่วน: <b>CodeQL</b> (SAST) และ <b>Dependency Review</b> (SCA) รันใน GitHub Actions, <b>Dependabot</b> และ <b>Secret scanning + push protection</b> เป็น setting ของ repo</li>
+    <li>CodeQL บน PR ที่มีช่องโหว่ (#9) <b>fail</b> จับช่องโหว่ในโค้ดได้ <b>8 จาก 12 จุด</b> (Snyk ได้ 5) ส่วน PR ที่แก้แล้ว (#10) <b>ผ่าน</b> (เหลือ Medium 1 ที่เป็น false positive)</li>
+    <li>เด่นเรื่อง command injection, SSRF, ปิด TLS และ SQLi แต่พลาด path traversal และ <code>dangerouslySetInnerHTML</code> และไม่มี IaC / container scan</li>
+    <li><b>รันในเครื่องได้บางส่วน:</b> CodeQL มี CLI ให้รันในเครื่อง (ฟรีสำหรับโค้ด open source) ส่วน SCA ใช้ <code>npm audit</code> ซึ่งใช้ฐานข้อมูล GitHub Advisory เดียวกัน (<a href="#local">ดูข้อ 8</a>)</li>
+  </ul>
+</div>
+
+<div class="kpis">
+  <div class="kpi fail"><div class="n">❌ 9</div><div class="l">PR #9 · CodeQL alert ระดับ High/Critical</div></div>
+  <div class="kpi"><div class="n">29</div><div class="l">CVE ใน axios + lodash ที่ PR เพิ่มเข้ามา (High 14)</div></div>
+  <div class="kpi pass"><div class="n">✅ 0</div><div class="l">PR #10 (secure) · High/Critical</div></div>
+  <div class="kpi"><div class="n">~1 นาที</div><div class="l">เวลา job CodeQL + Dependency Review</div></div>
+</div>
+
+<nav class="card toc"><strong>สารบัญ</strong>
+<ol>
+  <li><a href="#what">GHAS มีอะไรบ้าง</a></li>
+  <li><a href="#setup">ขั้นตอนนำเข้ามาใช้ (ที่ทำจริง)</a></li>
+  <li><a href="#how">ผลแสดงที่ไหน</a></li>
+  <li><a href="#pr9">ผลสแกน PR #9 (vulnerable)</a></li>
+  <li><a href="#pr10">ผลสแกน PR #10 (secure)</a></li>
+  <li><a href="#compare">เทียบกับ Snyk และ Aikido</a></li>
+  <li><a href="#fp">เหตุการณ์ระหว่างทาง: scanner จับโค้ดของเราเอง</a></li>
+  <li><a href="#local">รัน GHAS ในเครื่องได้ไหม</a></li>
+  <li><a href="#limits">ข้อดี ข้อจำกัด และสิ่งที่ควรทำต่อ</a></li>
+</ol></nav>
+
+<h2 id="what">1. GHAS มีอะไรบ้าง</h2>
+<div class="wrap"><table>
+<thead><tr><th>ส่วน</th><th>ทำอะไร</th><th>เปิดที่ไหน</th><th>สถานะใน repo นี้</th></tr></thead>
+<tbody>
+<tr><td><b>CodeQL</b> (code scanning)</td><td>SAST: วิเคราะห์ data flow จาก input ไปถึงจุดอันตราย</td><td>workflow (job <code>ghas</code>)</td><td><span class="tag ok">ใช้งาน</span></td></tr>
+<tr><td><b>Dependency Review</b></td><td>SCA บน PR: บอก dependency ที่ PR เพิ่มเข้ามาและมี CVE</td><td>workflow (job <code>ghas</code>)</td><td><span class="tag ok">ใช้งาน</span> หลังเปิด Dependency graph</td></tr>
+<tr><td><b>Dependabot alerts / security updates</b></td><td>แจ้ง CVE ใน dependency บน <code>main</code> และเปิด PR อัปเกรดให้</td><td>Settings → Code security</td><td><span class="tag warn">ยังปิด</span></td></tr>
+<tr><td><b>Dependabot version updates</b></td><td>เปิด PR อัปเดต dependency ทุกสัปดาห์</td><td><code>.github/dependabot.yml</code></td><td><span class="tag warn">ทำงานหลัง merge เข้า main</span></td></tr>
+<tr><td><b>Secret scanning + push protection</b></td><td>หา token ใน repo และบล็อก push ที่มี token</td><td>Settings → Code security</td><td><span class="tag ok">เปิดอยู่แล้ว</span></td></tr>
+<tr><td>IaC / Container image</td><td>—</td><td>—</td><td><span class="tag no">ไม่มีใน GHAS</span></td></tr>
+</tbody></table></div>
+
+<h2 id="setup">2. ขั้นตอนนำเข้ามาใช้ (ที่ทำจริง)</h2>
+<ol class="steps">
+  <li>
+    <h3>เช็กว่า repo เป็น public <span class="tag ok">ทำแล้ว</span></h3>
+    <p><code>gh repo view --json visibility</code> → <code>PUBLIC</code> จึงใช้ GHAS ได้ฟรีโดยไม่ต้องมี license</p>
+  </li>
+  <li>
+    <h3>เช็ก setting ของ Code security <span class="tag ok">ทำแล้ว</span></h3>
+    <p>secret scanning และ push protection เปิดอยู่แล้ว ส่วน Dependabot alerts / security updates ยังปิด และ Dependency graph ตอนแรกก็ปิด ทำให้ Dependency Review รันไม่ได้รอบแรก (<code>Dependency review is not supported on this repository</code>) พอเปิดแล้วก็ใช้ได้</p>
+  </li>
+  <li>
+    <h3>เพิ่ม job <code>ghas</code> ใน <code>.github/workflows/ci.yml</code> <span class="tag ok">ทำแล้ว</span></h3>
+    <p>อยู่ใน branch <code>feat/aikido-ghas</code> ใช้ action ทางการของ GitHub ไม่ต้องใช้ token เพิ่ม</p>
+<pre><code>ghas:
+  name: GHAS (CodeQL + Dependency Review)
+  permissions: { contents: read, security-events: write, actions: read }
+  steps:
+    - uses: actions/checkout@v4
+      with: { fetch-depth: 0 }
+    - uses: github/codeql-action/init@v3
+      with: { languages: javascript-typescript, queries: security-extended }
+    - uses: github/codeql-action/analyze@v3      <span class="muted"># อัปโหลดผลขึ้น Security tab ด้วย</span>
+      with: { output: codeql-results }
+    - run: node scripts/gate-count.mjs codeql reports/ghas-codeql.sarif   <span class="muted"># fail ถ้า High ขึ้นไป</span>
+    - uses: actions/dependency-review-action@v4
+      with: { base-ref: &lt;merge-base กับ main&gt;, head-ref: ${{ github.sha }}, fail-on-severity: high }</code></pre>
+    <p class="small muted">CodeQL รายงานผลแต่ไม่ fail เอง จึงเขียน <code>scripts/gate-count.mjs</code> นับ alert ที่ <code>security-severity ≥ 7.0</code> (เกณฑ์เดียวกับที่ GitHub แสดงเป็น High) ให้ใช้เกณฑ์เดียวกับ Snyk และ Aikido</p>
+  </li>
+  <li>
+    <h3>เพิ่ม <code>.github/dependabot.yml</code> <span class="tag ok">ทำแล้ว</span></h3>
+    <p>อัปเดต npm (รวม minor/patch เป็น PR เดียว), Docker base image และ GitHub Actions ทุกสัปดาห์</p>
+  </li>
+  <li>
+    <h3>เปิด PR เดโม #9 และ #10 <span class="tag ok">ทำแล้ว</span></h3>
+    <p>base เป็น <code>feat/aikido-ghas</code> (branch ที่มี job GHAS) diff ของ PR จึงเห็นแค่โค้ดฟีเจอร์ เหมือน #4/#5 ทุกไฟล์</p>
+    <div class="wrap"><table><thead><tr><th>PR</th><th>Branch</th><th>เทียบกับ</th><th>ความคาดหวัง</th></tr></thead><tbody>
+      <tr><td><a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/9">#9</a></td><td><code>demo/ghas-vulnerable</code></td><td>Snyk #4 · Aikido #7</td><td>ควร fail</td></tr>
+      <tr><td><a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/10">#10</a></td><td><code>demo/ghas-secure</code></td><td>Snyk #5 · Aikido #8</td><td>ควรผ่าน</td></tr>
+    </tbody></table></div>
+  </li>
+  <li>
+    <h3>รัน workflow แล้วดูผล <span class="tag ok">ทำแล้ว</span></h3>
+<pre><code>gh workflow run ci.yml --ref demo/ghas-vulnerable
+gh workflow run ci.yml --ref demo/ghas-secure</code></pre>
+  </li>
+</ol>
+
+<h2 id="how">3. ผลแสดงที่ไหน</h2>
+<div class="two">
+  <div class="card"><strong>① Status บน PR</strong>
+    <p class="small"><code>Scanner / ghas</code> (pass/fail ของ job GHAS) และ job <code>GHAS (CodeQL + Dependency Review)</code> ในหน้า Actions พร้อม annotation ชี้บรรทัดที่มีปัญหา</p></div>
+  <div class="card"><strong>② Security tab ของ repo</strong>
+    <p class="small">Code scanning alerts แยกตาม branch มีคำอธิบาย ตัวอย่างโค้ด และ data flow path ปิด alert ได้ (dismiss) พร้อมเหตุผล และใช้ <b>Copilot Autofix</b> เสนอโค้ดที่แก้แล้วได้</p></div>
+</div>
+<div class="card"><strong>③ report.html</strong> <span class="small muted">· แถว GitHub Advanced Security ในตารางเทียบ 3 tool (artifact <code>security-report</code> หรือ <code>npm run report</code>)</span></div>
+
+<h2 id="pr9">4. ผลสแกน PR #9 (vulnerable) <span class="tag no">FAIL</span></h2>
+<h3>CodeQL: 10 alert (Critical 4 · High 5 · Medium 2)</h3>
+<div class="wrap"><table>
+<thead><tr><th>ระดับ</th><th>Rule</th><th>ปัญหา</th><th>ไฟล์</th></tr></thead>
+<tbody>
+<tr><td><span class="sev critical">Critical</span></td><td><code>js/command-line-injection</code></td><td>Uncontrolled command line</td><td><code>app/api/tools/ping/route.ts:8</code></td></tr>
+<tr><td><span class="sev critical">Critical</span></td><td><code>js/request-forgery</code></td><td>Server-side request forgery</td><td><code>app/api/tools/notify/route.ts:13</code></td></tr>
+<tr><td><span class="sev critical">Critical</span></td><td><code>js/code-injection</code></td><td>Code injection (<code>eval</code>)</td><td><code>app/api/calc/route.ts:8</code></td></tr>
+<tr><td><span class="sev critical">Critical</span></td><td><code>js/code-injection</code></td><td>Code injection (postMessage → <code>eval</code>)</td><td><code>app/welcome/WelcomeClient.tsx:20</code></td></tr>
+<tr><td><span class="sev high">High</span></td><td><code>js/sql-injection</code></td><td>Database query built from user-controlled sources</td><td><code>lib/users.ts:7</code></td></tr>
+<tr><td><span class="sev high">High</span></td><td><code>js/disabling-certificate-validation</code></td><td>Disabling certificate validation</td><td><code>app/api/tools/notify/route.ts:16</code></td></tr>
+<tr><td><span class="sev high">High</span></td><td><code>js/xss</code></td><td>Client-side cross-site scripting (<code>innerHTML</code>)</td><td><code>app/welcome/WelcomeClient.tsx:15</code></td></tr>
+<tr><td><span class="sev high">High</span></td><td><code>js/xss</code></td><td>Client-side cross-site scripting (<code>location.href</code>)</td><td><code>app/welcome/WelcomeClient.tsx:30</code></td></tr>
+<tr><td><span class="sev medium">Medium</span></td><td><code>js/client-side-unvalidated-url-redirection</code></td><td>Client-side URL redirect</td><td><code>app/welcome/WelcomeClient.tsx:30</code></td></tr>
+<tr><td><span class="sev medium">Medium</span></td><td><code>js/missing-origin-check</code></td><td>Missing origin verification in postMessage handler</td><td><code>app/welcome/WelcomeClient.tsx:19</code></td></tr>
+</tbody></table></div>
+<p class="small muted">รอบแรกมี alert ที่ 11 คือ <code>js/incomplete-sanitization</code> ใน <code>scripts/build-report.mjs</code> ซึ่งเป็นโค้ดของ POC เอง แก้แล้ว (ดูข้อ 7) ตัวเลข "9" ใน KPI ด้านบนคือ Critical/High ในโค้ดเดโม (4 + 5)</p>
+
+<h3>Dependency Review: dependency ที่ PR เพิ่มเข้ามา</h3>
+<div class="wrap"><table>
+<thead><tr><th>Package</th><th>CVE ทั้งหมด</th><th>High</th><th>Moderate</th><th>Low</th></tr></thead>
+<tbody>
+<tr><td><code>axios@0.21.1</code></td><td class="c">24</td><td class="c">11</td><td class="c">12</td><td class="c">1</td></tr>
+<tr><td><code>lodash@4.17.15</code></td><td class="c">5</td><td class="c">3</td><td class="c">2</td><td class="c">0</td></tr>
+</tbody></table></div>
+<p class="small muted">ข้อมูลจาก GitHub dependency graph compare API (แหล่งเดียวกับที่ Dependency Review action ใช้) หลังเปิด Dependency graph แล้ว · GitHub Advisory ไม่ได้ให้ Critical กับตัวไหนเลย ส่วน Snyk ให้ axios 2 ตัวเป็น Critical</p>
+
+<h3>สิ่งที่ GHAS ไม่ได้รายงานใน #9</h3>
+<ul>
+  <li><b>Path traversal</b> ใน <code>app/api/tools/files</code> และ <b>XSS ผ่าน <code>dangerouslySetInnerHTML</code></b> ใน <code>app/page.tsx</code> (Aikido จับได้ทั้งคู่)</li>
+  <li><b>Server open redirect</b> ใน <code>app/api/go</code></li>
+  <li><b>Hardcoded password</b> <code>"SuperSecret123!"</code>: secret scanning จับเฉพาะ token ที่มีรูปแบบของผู้ให้บริการ (AWS, GitHub, Slack ฯลฯ) ไม่จับรหัสผ่านทั่วไป</li>
+  <li><b>k8s</b> และ <b>Docker base image</b>: GHAS ไม่มีการสแกน IaC และ container</li>
+</ul>
+
+<h2 id="pr10">5. ผลสแกน PR #10 (secure) <span class="tag ok">PASS (CodeQL)</span></h2>
+<div class="wrap"><table>
+<thead><tr><th>ระดับ</th><th>Rule</th><th>ไฟล์</th><th>ความเห็น</th></tr></thead>
+<tbody>
+<tr><td><span class="sev medium">Medium</span></td><td><code>js/client-side-unvalidated-url-redirection</code></td><td><code>app/welcome/WelcomeClient.tsx:26</code></td><td><b>False positive:</b> โค้ดผ่าน <code>safeNext()</code> ที่อนุญาตเฉพาะ path ภายใน (ขึ้นต้น <code>/</code> ไม่ใช่ <code>//</code>) แล้ว แต่ CodeQL ไม่รู้จักฟังก์ชันนี้ว่าเป็นตัวกรอง ไม่ถึง High จึงไม่บล็อก</td></tr>
+</tbody></table></div>
+<p>Dependency Review: #10 ไม่ได้เพิ่ม dependency ใหม่ จึงไม่มีอะไรให้รายงาน</p>
+
+<h2 id="compare">6. เทียบกับ Snyk และ Aikido</h2>
+<p class="small muted">✅ = รายงานระดับ High ขึ้นไป · 🟡 = รายงานแต่ต่ำกว่า High · ❌ = ไม่รายงาน · ช่อง ❌ ของ Snyk = ไม่มีในระดับ High</p>
+<div class="wrap"><table>
+<thead><tr><th>ช่องโหว่ในโค้ดเดโม</th><th>Unit test</th><th>Snyk #4</th><th>Aikido #7</th><th>GHAS #9</th></tr></thead>
+<tbody>
+<tr><td>SQL Injection</td><td class="c">✅</td><td class="c">❌</td><td class="c">✅</td><td class="c">✅</td></tr>
+<tr><td>XSS <code>dangerouslySetInnerHTML</code></td><td class="c"></td><td class="c">❌</td><td class="c">✅</td><td class="c">❌</td></tr>
+<tr><td>DOM XSS <code>innerHTML</code></td><td class="c"></td><td class="c">✅</td><td class="c">✅</td><td class="c">✅</td></tr>
+<tr><td>postMessage → eval</td><td class="c"></td><td class="c">❌</td><td class="c">✅</td><td class="c">✅</td></tr>
+<tr><td>Client open redirect</td><td class="c"></td><td class="c">❌</td><td class="c">✅</td><td class="c">✅</td></tr>
+<tr><td>Command Injection</td><td class="c">✅</td><td class="c">✅</td><td class="c">❌</td><td class="c">✅</td></tr>
+<tr><td>Path Traversal</td><td class="c">✅</td><td class="c">✅</td><td class="c">✅</td><td class="c">❌</td></tr>
+<tr><td>SSRF</td><td class="c">✅</td><td class="c">✅</td><td class="c">🟡</td><td class="c">✅</td></tr>
+<tr><td>ปิด TLS</td><td class="c"></td><td class="c">❌</td><td class="c">❌</td><td class="c">✅</td></tr>
+<tr><td>Code Injection <code>eval</code></td><td class="c"></td><td class="c">✅</td><td class="c">✅</td><td class="c">✅</td></tr>
+<tr><td>Server open redirect</td><td class="c"></td><td class="c">❌</td><td class="c">✅</td><td class="c">❌</td></tr>
+<tr><td>Hardcoded password</td><td class="c"></td><td class="c">❌</td><td class="c">❌</td><td class="c">❌</td></tr>
+<tr><td><b>รวม (12 จุดในโค้ด)</b></td><td class="c"><b>4</b></td><td class="c"><b>5</b></td><td class="c"><b>8</b></td><td class="c"><b>8</b></td></tr>
+<tr><td>Dependency (axios, lodash)</td><td class="c"></td><td class="c">✅ 16</td><td class="c">✅ 14</td><td class="c">✅ 29 (High 14)</td></tr>
+<tr><td>k8s hostNetwork / hostPID</td><td class="c"></td><td class="c">🟡</td><td class="c">❌</td><td class="c">ไม่รองรับ</td></tr>
+<tr><td>Base image / root</td><td class="c"></td><td class="c">✅ 31 CVE</td><td class="c">🟡 root</td><td class="c">ไม่รองรับ</td></tr>
+<tr><td>PR secure ผ่านไหม</td><td class="c">✅</td><td class="c">✅ #5</td><td class="c">✅ #8</td><td class="c">✅ #10</td></tr>
+</tbody></table></div>
+<div class="callout info small">Aikido กับ GHAS ได้ 8 เท่ากัน แต่จับ<b>คนละชุด</b>: GHAS เก่งฝั่ง backend data flow (command, SSRF, TLS) ส่วน Aikido เก่งฝั่ง pattern (redirect, file read, dangerouslySetInnerHTML) ถ้าใช้ GHAS คู่กับ Aikido จะครอบคลุม 11 จาก 12 จุด (พลาดแค่ hardcoded password)</div>
+
+<h2 id="fp">7. เหตุการณ์ระหว่างทาง: scanner จับโค้ดของเราเอง</h2>
+<p>รอบแรกที่รันบน #10 (secure) ทั้ง GHAS และ Snyk fail ทั้งที่โค้ดเดโมปลอดภัย สาเหตุอยู่ในสคริปต์ report ที่เพิ่มมาใน POC</p>
+<div class="wrap"><table>
+<thead><tr><th>Tool</th><th>สิ่งที่เจอ</th><th>เป็นจริงไหม</th><th>แก้อย่างไร</th></tr></thead>
+<tbody>
+<tr><td>CodeQL</td><td><code>js/incomplete-sanitization</code> ที่ <code>scripts/build-report.mjs</code>: escape <code>|</code> ในตาราง Markdown แต่ไม่ escape <code>\</code></td><td><b>จริง</b> (bug เล็ก ๆ)</td><td>escape <code>\</code> ก่อน แล้วค่อย escape <code>|</code></td></tr>
+<tr><td>Snyk Code</td><td>Hardcoded Non-Cryptographic Secret 2 จุด: key ชื่อ <code>secrets:</code> ที่มีค่าเป็นข้อความ</td><td>False positive</td><td>เปลี่ยนชื่อ key เป็น <code>leak</code></td></tr>
+</tbody></table></div>
+<p class="small">แก้แล้ว push เข้า <code>feat/aikido-ghas</code> พอรันใหม่ #10 ก็ผ่าน เป็นตัวอย่างที่ดีว่า CodeQL จับปัญหาเล็ก ๆ ในสคริปต์ได้ด้วย ไม่ใช่แค่ในแอป</p>
+
+<h2 id="local">8. รัน GHAS ในเครื่องได้ไหม</h2>
+<p><b>ได้บางส่วน</b> แยกตามส่วนประกอบ:</p>
+<div class="wrap"><table>
+<thead><tr><th>ส่วน</th><th>รันในเครื่อง</th><th>วิธี</th></tr></thead>
+<tbody>
+<tr><td>CodeQL</td><td><span class="tag ok">ได้</span></td><td>CodeQL CLI หรือ VS Code extension "CodeQL" ใช้ query ชุดเดียวกับใน CI <b>License:</b> ใช้ฟรีกับโค้ด open source (repo นี้เป็น public) ถ้าเป็นโค้ด private ขององค์กรต้องมี license GitHub Code Security</td></tr>
+<tr><td>Dependency Review</td><td><span class="tag warn">ใกล้เคียง</span></td><td>ไม่มีเวอร์ชันในเครื่อง ใช้ <code>npm audit --audit-level=high</code> แทนได้ เพราะใช้ฐานข้อมูล GitHub Advisory เดียวกัน (มีใน <code>scripts/local-scan.sh</code> อยู่แล้ว)</td></tr>
+<tr><td>Secret scanning</td><td><span class="tag no">ไม่ได้</span></td><td>ทำงานฝั่ง GitHub เท่านั้น แต่ <b>push protection</b> บล็อกตั้งแต่ตอน <code>git push</code> อยู่แล้ว ถ้าอยากเช็กก่อน commit ให้ใช้เครื่องมือ open source เช่น gitleaks</td></tr>
+<tr><td>Dependabot</td><td><span class="tag no">ไม่ได้</span></td><td>ทำงานบน GitHub เท่านั้น ดู alert ด้วย <code>npm run ghas:alerts</code></td></tr>
+</tbody></table></div>
+
+<h3>ขั้นตอนรัน CodeQL ในเครื่อง (macOS)</h3>
+<pre><code><span class="muted"># 1) ติดตั้ง CodeQL CLI (ครั้งเดียว, ~1 GB รวม query pack)</span>
+brew install --cask codeql
+
+<span class="muted"># 2) สร้างฐานข้อมูลจากโค้ด (JS/TS ไม่ต้อง build)</span>
+codeql database create .codeql-db --language=javascript-typescript --source-root . --overwrite
+
+<span class="muted"># 3) วิเคราะห์ด้วย query ชุดเดียวกับ CI (security-extended)</span>
+codeql database analyze .codeql-db codeql/javascript-queries:codeql-suites/javascript-security-extended.qls \
+  --download --format=sarif-latest --output=reports/ghas-codeql.sarif
+
+<span class="muted"># 4) ใช้เกณฑ์ gate เดียวกับ CI (fail ถ้า High ขึ้นไป)</span>
+node scripts/gate-count.mjs codeql reports/ghas-codeql.sarif</code></pre>
+<div class="callout warn small">ยังไม่ได้ลองรันคำสั่งชุดนี้ในเครื่องของ POC (ต้องดาวน์โหลด CLI ก่อน) ถ้าต้องการ ผมเพิ่มเป็น <code>npm run ghas:local</code> และใส่ไว้ใน <code>npm run security:local</code> ให้ได้ แล้ว report.html ในเครื่องจะมีแถว GHAS ด้วย ควรเพิ่ม <code>.codeql-db/</code> ใน <code>.gitignore</code></div>
+
+<h2 id="limits">9. ข้อดี ข้อจำกัด และสิ่งที่ควรทำต่อ</h2>
+<div class="two">
+  <div class="card"><strong>ข้อดี</strong>
+    <ul class="small">
+      <li>ฟรีสำหรับ repo public ใช้ action ทางการ ไม่ต้องมี token หรือบัญชีเพิ่ม</li>
+      <li>CodeQL วิเคราะห์ data flow ได้ลึก จับ command injection, SSRF, TLS off ได้แม่น</li>
+      <li>ผลรวมอยู่ใน Security tab ของ GitHub เลย ไม่ต้องเข้า dashboard อื่น</li>
+      <li>SCA ใช้ GitHub Advisory DB รายงาน CVE ได้ละเอียด (29 รายการ)</li>
+      <li>Push protection บล็อก token ที่หลุดตั้งแต่ตอน push</li>
+    </ul>
+  </div>
+  <div class="card"><strong>ข้อจำกัด</strong>
+    <ul class="small">
+      <li>repo private ต้องซื้อ license (คิดต่อ active committer)</li>
+      <li>ไม่มี IaC และ container image scan ต้องใช้ tool อื่นเสริม</li>
+      <li>CodeQL ไม่ fail เอง ต้องเขียน gate เพิ่ม (<code>gate-count.mjs</code>)</li>
+      <li>พลาด path traversal, <code>dangerouslySetInnerHTML</code>, server redirect ในเดโมนี้</li>
+      <li>Secret scanning ไม่จับรหัสผ่านทั่วไป</li>
+      <li>ต้องเปิด Dependency graph เอง ไม่งั้น Dependency Review ใช้ไม่ได้</li>
+    </ul>
+  </div>
+</div>
+<h3>สิ่งที่แนะนำให้ทำต่อ</h3>
+<ol class="small">
+  <li>เปิด <b>Dependabot alerts</b> และ <b>security updates</b> ที่ Settings → Code security เพื่อให้ได้ fix PR อัตโนมัติบน <code>main</code></li>
+  <li>ลอง <b>Copilot Autofix</b> บน alert ของ #9 ใน Security tab แล้วเทียบกับ suggested change ของ Aikido</li>
+  <li>ถ้าเลือก GHAS: ตั้ง <code>gh variable set GATE_TOOLS --body "ghas"</code> (หรือ <code>"snyk ghas"</code>) แล้วทำ <code>CI + Security Gate</code> เป็น required check</li>
+  <li>เสริม IaC / container ด้วย KICS หรือ Trivy (ฟรี) เพราะ GHAS ไม่มีส่วนนี้</li>
+</ol>
+<p class="small muted">ที่มา: PR <a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/9">#9</a>, <a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/10">#10</a>, Code scanning alerts API ของ repo, dependency graph compare API, <a href="https://docs.github.com/en/code-security/codeql-cli">CodeQL CLI docs</a>, <a href="https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md">CodeQL license</a></p>
+</main>
+</body>
+</html>

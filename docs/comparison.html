@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner Comparison</title>
+<style>
+:root{--bg:#f6f6f8;--panel:#fff;--text:#18181b;--muted:#6b7280;--border:#e4e4e7;--accent:#6551f3;--accent-bg:#efedfe;
+--pass:#15803d;--pass-bg:#ecfdf3;--fail:#b91c1c;--fail-bg:#fef2f2;--warn:#b45309;--warn-bg:#fffbeb;
+--crit:#7f1d1d;--high:#dc2626;--med:#d97706;--low:#6b7280;--code-bg:#f4f4f5}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0f12;--panel:#18181c;--text:#f4f4f5;--muted:#a1a1aa;--border:#2e2e35;--accent:#a99cff;--accent-bg:#221f3d;
+--pass:#4ade80;--pass-bg:#0f2418;--fail:#f87171;--fail-bg:#2a1215;--warn:#fbbf24;--warn-bg:#2a2010;--code-bg:#232329}}
+:root[data-theme="dark"]{--bg:#0f0f12;--panel:#18181c;--text:#f4f4f5;--muted:#a1a1aa;--border:#2e2e35;--accent:#a99cff;--accent-bg:#221f3d;
+--pass:#4ade80;--pass-bg:#0f2418;--fail:#f87171;--fail-bg:#2a1215;--warn:#fbbf24;--warn-bg:#2a2010;--code-bg:#232329}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Noto Sans Thai",sans-serif}
+main{max-width:1040px;margin:0 auto;padding:32px 16px 80px}
+header h1{font-size:28px;line-height:1.25;margin:0 0 6px}
+header p{margin:0;color:var(--muted)}
+h2{font-size:21px;margin:44px 0 10px;padding-top:8px;border-top:1px solid var(--border)}
+h3{font-size:16px;margin:22px 0 6px}
+a{color:var(--accent)}
+.muted{color:var(--muted)}.small{font-size:13px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin:12px 0}
+.tldr{border-left:5px solid var(--accent)}
+.tldr ul{margin:6px 0 0;padding-left:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi .n{font-size:30px;font-weight:700;line-height:1.1}.kpi .l{font-size:13px;color:var(--muted)}
+.kpi.fail .n{color:var(--fail)}.kpi.pass .n{color:var(--pass)}
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 22px 52px}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+ol.steps>li::after{content:"";position:absolute;left:16px;top:38px;bottom:4px;width:2px;background:var(--border)}
+ol.steps>li:last-child::after{display:none}
+ol.steps h3{margin:4px 0 4px}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;vertical-align:middle;margin-left:6px}
+.tag.ok{background:var(--pass-bg);color:var(--pass)}.tag.no{background:var(--fail-bg);color:var(--fail)}.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;margin:10px 0}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;background:var(--panel)}
+tr:last-child td{border-bottom:0}
+td.c{text-align:center;white-space:nowrap}
+.sev{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:4px;color:#fff;white-space:nowrap}
+.sev.critical{background:var(--crit)}.sev.high{background:var(--high)}.sev.medium{background:var(--med)}.sev.low{background:var(--low)}
+code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code-bg);padding:1px 5px;border-radius:4px;word-break:break-word}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:8px 0}
+pre code{background:none;padding:0}
+.del{color:var(--fail)}.add{color:var(--pass)}
+figure{margin:10px 0}figure img{width:100%;border:1px solid var(--border);border-radius:10px;display:block}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.callout{border-radius:10px;padding:12px 14px;margin:10px 0}
+.callout.warn{background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent)}
+.callout.info{background:var(--accent-bg);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:720px){.two{grid-template-columns:1fr}header h1{font-size:23px}ol.steps>li{padding-left:44px}}
+.mock{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px}
+.mock .who{font-weight:600}.mock .who span{color:var(--muted);font-weight:400}
+nav.toc{font-size:14px}nav.toc a{text-decoration:none}nav.toc ol{margin:4px 0 0;padding-left:20px;columns:2}
+@media (max-width:720px){nav.toc ol{columns:1}}
+.t-snyk{color:#7c3aed}.t-aik{color:#4f46e5}.t-ghas{color:#0f766e}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .t-snyk{color:#c4b5fd}:root:not([data-theme="light"]) .t-aik{color:#a5b4fc}:root:not([data-theme="light"]) .t-ghas{color:#5eead4}}
+td.hit{background:var(--pass-bg)}td.miss{background:var(--fail-bg)}td.part{background:var(--warn-bg)}td.na{color:var(--muted)}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--code-bg);margin-top:6px}
+.bar span{display:block;height:100%}
+.bar .c{background:var(--crit)}.bar .h{background:var(--high)}.bar .m{background:var(--med)}.bar .l{background:var(--low)}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+@media (max-width:760px){.tools{grid-template-columns:1fr}}
+.tool h3{margin:0 0 2px}.tool .big{font-size:32px;font-weight:700;line-height:1.1}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>เปรียบเทียบผลสแกน Snyk · Aikido · GitHub Advanced Security</h1>
+  <p>เฉพาะ branch ที่มีช่องโหว่ (ควร fail) · โค้ดชุดเดียวกันทุกไฟล์ · Snyk <a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/4">#4</a> · Aikido <a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/7">#7</a> · GHAS <a href="https://github.com/nathaphat-s/cicd-checkmarx-poc/pull/9">#9</a> · ข้อมูล ณ 16 พ.ย. 2026</p>
+</header>
+
+<div class="card tldr">
+  <strong>สรุปสั้น</strong>
+  <ul>
+    <li><b>ทั้ง 3 ตัว fail ถูกต้อง</b> บน branch ที่มีช่องโหว่ และ<b>ผ่านทั้ง 3 ตัว</b>บน branch ที่แก้แล้ว (#5, #8, #10)</li>
+    <li>ช่องโหว่ที่ฝังในโค้ด 12 จุด: <b class="t-aik">Aikido 8</b> · <b class="t-ghas">GHAS 8</b> · <b class="t-snyk">Snyk 5</b> (นับเฉพาะที่รายงานระดับ High ขึ้นไป) และ Aikido กับ GHAS จับ<b>คนละชุด</b> ถ้าใช้คู่กันจะได้ 11/12</li>
+    <li><b>SQL injection</b> (ช่องโหว่คลาสสิกที่สุด) Snyk ไม่รายงาน แต่ Aikido และ GHAS จับได้ ส่วน <b>hardcoded password</b> ไม่มีตัวไหนจับได้เลย</li>
+    <li><b>Container image</b> มีแค่ <b class="t-snyk">Snyk</b> ที่สแกน (31 CVE ระดับ High ขึ้นไปใน <code>node:22-bullseye</code>) ส่วน <b>IaC (k8s)</b> ไม่มีตัวไหนรายงานถึงระดับ High</li>
+    <li>SCA: ทุกตัวเจอ axios + lodash แต่ให้จำนวนและความรุนแรงต่างกัน เพราะใช้ฐานข้อมูลช่องโหว่คนละชุด</li>
+  </ul>
+</div>
+
+<div class="tools">
+  <div class="card tool"><h3 class="t-snyk">Snyk · #4</h3><div class="big">52</div><div class="small muted">รายการระดับ High ขึ้นไป (Code 5 · OSS 16 · Container 31 · IaC 0)</div>
+    <div class="bar"><span class="c" style="width:19%"></span><span class="h" style="width:81%"></span></div>
+    <div class="small muted" style="margin-top:6px">Critical 10 · High 42 · โค้ด 5/12</div></div>
+  <div class="card tool"><h3 class="t-aik">Aikido · #7</h3><div class="big">16</div><div class="small muted">รายการระดับ High ขึ้นไป (Code 8 · SCA 8 CVE) + Medium 2 + SCA Medium 6</div>
+    <div class="bar"><span class="c" style="width:31%"></span><span class="h" style="width:69%"></span></div>
+    <div class="small muted" style="margin-top:6px">Critical 5 · High 11 · โค้ด 8/12</div></div>
+  <div class="card tool"><h3 class="t-ghas">GHAS · #9</h3><div class="big">22</div><div class="small muted">รายการระดับ High ขึ้นไป (CodeQL 8 · Dependency 14 CVE) + Medium 2 + SCA Moderate/Low 15</div>
+    <div class="bar"><span class="c" style="width:18%"></span><span class="h" style="width:82%"></span></div>
+    <div class="small muted" style="margin-top:6px">Critical 4 · High 18 · โค้ด 8/12</div></div>
+</div>
+<p class="small muted">จำนวนรวมเทียบตรง ๆ ไม่ได้ทีเดียว: Snyk นับ CVE ของ OS package ใน container ด้วย (31 รายการ) ส่วน Aikido รวม CVE ของ dependency เป็น comment เดียว ให้ดูตารางรายช่องโหว่ด้านล่างประกอบ</p>
+
+<h2 id="matrix">1. ช่องโหว่ในโค้ดทีละจุด</h2>
+<p class="small muted">✅ = รายงานระดับ High ขึ้นไป (พร้อมระดับที่ tool ให้) · 🟡 = รายงานแต่ต่ำกว่า High · ❌ = ไม่รายงาน · ช่อง ❌ ของ Snyk = ไม่มีในระดับ High (ผล Snyk เก็บเฉพาะ High ขึ้นไป)</p>
+<div class="wrap"><table>
+<thead><tr><th>#</th><th>ช่องโหว่</th><th>ไฟล์</th><th class="t-snyk">Snyk #4</th><th class="t-aik">Aikido #7</th><th class="t-ghas">GHAS #9</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>SQL Injection</td><td><code>lib/users.ts</code></td><td class="c miss">❌</td><td class="c hit">✅ Critical</td><td class="c hit">✅ High</td></tr>
+<tr><td>2</td><td>Command Injection (<code>exec</code>)</td><td><code>app/api/tools/ping</code></td><td class="c hit">✅ High</td><td class="c miss">❌</td><td class="c hit">✅ Critical</td></tr>
+<tr><td>3</td><td>Path Traversal</td><td><code>app/api/tools/files</code></td><td class="c hit">✅ High</td><td class="c hit">✅ High</td><td class="c miss">❌</td></tr>
+<tr><td>4</td><td>SSRF</td><td><code>app/api/tools/notify</code></td><td class="c hit">✅ High</td><td class="c part">🟡 Medium</td><td class="c hit">✅ Critical</td></tr>
+<tr><td>5</td><td>ปิด TLS verification</td><td><code>app/api/tools/notify</code></td><td class="c miss">❌</td><td class="c miss">❌</td><td class="c hit">✅ High</td></tr>
+<tr><td>6</td><td>Hardcoded password</td><td><code>app/api/tools/notify</code></td><td class="c miss">❌</td><td class="c miss">❌</td><td class="c miss">❌</td></tr>
+<tr><td>7</td><td>Code Injection (<code>eval</code>) ฝั่ง server</td><td><code>app/api/calc</code></td><td class="c hit">✅ High</td><td class="c hit">✅ Critical</td><td class="c hit">✅ Critical</td></tr>
+<tr><td>8</td><td>Open Redirect ฝั่ง server</td><td><code>app/api/go</code></td><td class="c miss">❌</td><td class="c hit">✅ Critical</td><td class="c miss">❌</td></tr>
+<tr><td>9</td><td>XSS ผ่าน <code>dangerouslySetInnerHTML</code></td><td><code>app/page.tsx</code></td><td class="c miss">❌</td><td class="c hit">✅ High</td><td class="c miss">❌</td></tr>
+<tr><td>10</td><td>DOM XSS (<code>innerHTML</code>)</td><td><code>app/welcome/WelcomeClient.tsx</code></td><td class="c hit">✅ High</td><td class="c hit">✅ High</td><td class="c hit">✅ High</td></tr>
+<tr><td>11</td><td>postMessage → <code>eval</code></td><td><code>app/welcome/WelcomeClient.tsx</code></td><td class="c miss">❌</td><td class="c hit">✅ Critical</td><td class="c hit">✅ Critical</td></tr>
+<tr><td>12</td><td>Open Redirect ฝั่ง client (<code>location.href</code>)</td><td><code>app/welcome/WelcomeClient.tsx</code></td><td class="c miss">❌</td><td class="c hit">✅ High (เป็น XSS)</td><td class="c hit">✅ High (เป็น XSS)</td></tr>
+<tr><td></td><td><b>รวม</b></td><td></td><td class="c"><b>5 / 12</b></td><td class="c"><b>8 / 12</b></td><td class="c"><b>8 / 12</b></td></tr>
+</tbody></table></div>
+<div class="callout info small">จุดที่<b>มีแค่ตัวเดียวจับได้</b>: ปิด TLS (GHAS), server open redirect (Aikido), <code>dangerouslySetInnerHTML</code> (Aikido) · จุดที่<b>ทุกตัวจับได้</b>: eval ฝั่ง server, DOM XSS · จุดที่<b>ไม่มีใครจับ</b>: hardcoded password (unit test ก็ไม่ได้เขียนไว้)</div>
+
+<h2 id="sast">2. รายละเอียด SAST: แต่ละตัวเรียกชื่อปัญหาว่าอะไร</h2>
+<div class="wrap"><table>
+<thead><tr><th>จุด</th><th class="t-snyk">Snyk Code</th><th class="t-aik">Aikido</th><th class="t-ghas">CodeQL</th></tr></thead>
+<tbody>
+<tr><td>SQLi</td><td class="na">—</td><td>Potential SQL injection via string-based query concatenation <span class="sev critical">Critical</span></td><td><code>js/sql-injection</code> Database query built from user-controlled sources <span class="sev high">High</span></td></tr>
+<tr><td>Command</td><td>Command Injection <span class="sev high">High</span></td><td class="na">—</td><td><code>js/command-line-injection</code> Uncontrolled command line <span class="sev critical">Critical</span></td></tr>
+<tr><td>Path</td><td>Path Traversal <span class="sev high">High</span></td><td>Potential file inclusion attack via reading file <span class="sev high">High</span></td><td class="na">—</td></tr>
+<tr><td>SSRF</td><td>Server-Side Request Forgery (SSRF) <span class="sev high">High</span></td><td>HTTP request might enable SSRF attack <span class="sev medium">Medium</span></td><td><code>js/request-forgery</code> Server-side request forgery <span class="sev critical">Critical</span></td></tr>
+<tr><td>TLS</td><td class="na">—</td><td class="na">—</td><td><code>js/disabling-certificate-validation</code> <span class="sev high">High</span></td></tr>
+<tr><td>eval (calc)</td><td>Code Injection <span class="sev high">High</span></td><td>Remote Code Execution possible via eval()-type functions <span class="sev critical">Critical</span></td><td><code>js/code-injection</code> Code injection <span class="sev critical">Critical</span></td></tr>
+<tr><td>Redirect (server)</td><td class="na">—</td><td>Open redirect can be used in social engineering attacks <span class="sev critical">Critical</span></td><td class="na">—</td></tr>
+<tr><td>dangerouslySetInnerHTML</td><td class="na">—</td><td>Using dangerouslySetInnerHTML in React can lead to XSS attacks <span class="sev high">High</span></td><td class="na">—</td></tr>
+<tr><td>innerHTML</td><td>DOM-based Cross-site Scripting (XSS) <span class="sev high">High</span></td><td>Using document write methods can lead to XSS attacks <span class="sev high">High</span></td><td><code>js/xss</code> Client-side cross-site scripting <span class="sev high">High</span></td></tr>
+<tr><td>postMessage eval</td><td class="na">—</td><td>Remote Code Execution possible via eval()-type functions <span class="sev critical">Critical</span></td><td><code>js/code-injection</code> <span class="sev critical">Critical</span> + <code>js/missing-origin-check</code> <span class="sev medium">Medium</span></td></tr>
+<tr><td>location.href</td><td class="na">—</td><td>Potential XSS via window.location.href <span class="sev high">High</span></td><td><code>js/xss</code> <span class="sev high">High</span> + <code>js/client-side-unvalidated-url-redirection</code> <span class="sev medium">Medium</span></td></tr>
+<tr><td>Dockerfile root</td><td class="na">(อยู่ในผล Container)</td><td>Docker container runs as default root user <span class="sev medium">Medium</span></td><td class="na">ไม่รองรับ</td></tr>
+</tbody></table></div>
+<p class="small muted">สังเกต: Aikido ให้ระดับรุนแรงสูงกว่า (eval, redirect, SQLi เป็น Critical) ส่วน CodeQL ให้ Critical กับช่องโหว่ฝั่ง server ที่มี data flow ชัด (command, SSRF, eval)</p>
+
+<h2 id="sca">3. SCA: dependency ที่ PR เพิ่มเข้ามา</h2>
+<div class="wrap"><table>
+<thead><tr><th>Package</th><th class="t-snyk">Snyk Open Source</th><th class="t-aik">Aikido</th><th class="t-ghas">GHAS Dependency Review</th></tr></thead>
+<tbody>
+<tr><td><code>axios@0.21.1</code></td><td>11 รายการ (Critical 2 · High 9)</td><td>9 CVE · แก้ที่ 1.18.0</td><td>24 CVE (High 11 · Moderate 12 · Low 1)</td></tr>
+<tr><td><code>lodash@4.17.15</code></td><td>5 รายการ (High 5)</td><td>5 CVE (มี Critical) · แก้ที่ 4.18.0</td><td>5 CVE (High 3 · Moderate 2)</td></tr>
+<tr><td><b>รวม</b></td><td><b>16</b> (เก็บเฉพาะ High ขึ้นไป)</td><td><b>14</b> (Critical 1 · High 7 · Medium 6)</td><td><b>29</b> (High 14 · Moderate 14 · Low 1)</td></tr>
+<tr><td>แสดงผลอย่างไร</td><td>รายการต่อ CVE ใน CLI + dashboard + PR check <code>security/snyk</code></td><td>comment เดียวที่ <code>package-lock.json</code> บอกเวอร์ชันที่แก้</td><td>ตารางใน job summary ของ Actions + ลิงก์ GHSA</td></tr>
+</tbody></table></div>
+<p class="small muted">ตัวเลขต่างกันเพราะฐานข้อมูลต่างกัน (Snyk Vulnerability DB · Aikido · GitHub Advisory DB) และวิธีนับ (Snyk รวม CVE ที่ซ้ำกันเป็นรายการเดียว · GitHub นับแยกทุก advisory) ทุกตัวสรุปตรงกันว่า<b>ต้องอัปเกรดหรือเลิกใช้ axios และ lodash</b></p>
+
+<h2 id="infra">4. Container image และ IaC</h2>
+<div class="wrap"><table>
+<thead><tr><th></th><th class="t-snyk">Snyk</th><th class="t-aik">Aikido (PR check)</th><th class="t-ghas">GHAS</th></tr></thead>
+<tbody>
+<tr><td>Container image <code>node:22-bullseye</code></td><td class="hit">✅ 31 CVE (Critical 8 · High 23) ใน OS package เช่น curl, zlib, perl, openexr + แนะนำ base image ใหม่</td><td class="part">🟡 ไม่ได้สแกน image (ต้องใช้ local image scan ที่เป็นแผนเสียเงิน) เจอแค่ "runs as root" ระดับ Medium จาก Dockerfile</td><td class="na">ไม่รองรับ</td></tr>
+<tr><td>k8s <code>hostNetwork</code> / <code>hostPID</code> / secret แบบ plain text</td><td class="part">🟡 ต่ำกว่า High (ไม่บล็อก)</td><td class="miss">❌ ไม่รายงานใน PR</td><td class="na">ไม่รองรับ</td></tr>
+</tbody></table></div>
+
+<h2 id="ux">5. ประสบการณ์ใช้งานบน PR</h2>
+<div class="wrap"><table>
+<thead><tr><th></th><th class="t-snyk">Snyk</th><th class="t-aik">Aikido</th><th class="t-ghas">GHAS</th></tr></thead>
+<tbody>
+<tr><td>ผลขึ้นตรงไหน</td><td>check <code>security/snyk</code> + job ใน Actions + report.html</td><td>check <code>Aikido Security: check code</code> + <b>bot comment บนบรรทัดโค้ด</b></td><td>job ใน Actions (annotation) + <b>Security tab</b> + report.html</td></tr>
+<tr><td>ต้องแก้ CI ไหม</td><td>ใช่ (CLI ใน workflow) + มี GitHub App ด้วย</td><td>ไม่ต้อง (GitHub App)</td><td>ใช่ (action ทางการ)</td></tr>
+<tr><td>เวลาสแกน (ประมาณ)</td><td>~2 นาที 40 วิ (รวม build image)</td><td>~50 วิ</td><td>~1 นาที</td></tr>
+<tr><td>รายงานอะไร</td><td>ทุกปัญหาในโค้ดปัจจุบัน</td><td>เฉพาะปัญหา<b>ใหม่</b>ที่ PR เพิ่ม</td><td>CodeQL: ทุกปัญหา · Dependency Review: เฉพาะที่เพิ่ม</td></tr>
+<tr><td>เกณฑ์ fail ที่ตั้ง</td><td>High ขึ้นไป</td><td>Critical (ค่าเริ่มต้น ปรับได้)</td><td>High ขึ้นไป (CodeQL ผ่าน gate-count.mjs)</td></tr>
+<tr><td>คำแนะนำการแก้</td><td>อธิบาย + Fix PR สำหรับ dependency</td><td>"Show fix" + <b>Suggested change กด commit ได้</b> (เช่น SQLi)</td><td>คำอธิบายใน Security tab + Copilot Autofix</td></tr>
+<tr><td>False positive บน branch secure</td><td>0</td><td>0 (มี Low 1)</td><td>0 ระดับ High (มี Medium 1: client redirect ที่ป้องกันแล้ว)</td></tr>
+<tr><td>ค่าใช้จ่ายสำหรับ POC นี้</td><td>ฟรี (จำกัดจำนวน test)</td><td>ฟรีแบบ GitHub App · local scanner / AI ต้องจ่าย</td><td>ฟรี (repo public) · private ต้องซื้อ</td></tr>
+</tbody></table></div>
+
+<h2 id="verdict">6. สรุปและข้อเสนอ</h2>
+<div class="two">
+  <div class="card"><strong>ถ้าเลือกตัวเดียว</strong>
+    <ul class="small">
+      <li><b class="t-aik">Aikido</b>: จับโค้ดได้มากสุด (เท่า GHAS) ติดตั้งง่ายสุด comment อ่านง่าย แต่แผนฟรีไม่มี container scan และต้องปรับเกณฑ์เป็น High</li>
+      <li><b class="t-ghas">GHAS</b>: data flow ลึก (command, SSRF, TLS) ฟรีสำหรับ public แต่ไม่มี IaC/container และ private repo ต้องซื้อ</li>
+      <li><b class="t-snyk">Snyk</b>: ครบทุกประเภท (SAST, SCA, IaC, container) เด่นสุดเรื่อง container แต่ SAST จับในเดโมนี้ได้น้อยสุด (พลาด SQLi)</li>
+    </ul>
+  </div>
+  <div class="card"><strong>ถ้าใช้คู่กัน</strong>
+    <ul class="small">
+      <li><b>Aikido + GHAS</b> ครอบคลุมโค้ด 11/12 จุด แต่ยังขาด container</li>
+      <li><b>Snyk + GHAS</b> ครอบคลุมโค้ด 9/12 + container + IaC</li>
+      <li>ทุกแบบยังต้องมี <b>unit test ด้าน security</b> และ <b>secret scanner ที่จับรหัสผ่านทั่วไป</b> (เช่น gitleaks / Semgrep secrets) เพราะไม่มี tool ไหนจับ <code>"SuperSecret123!"</code></li>
+    </ul>
+  </div>
+</div>
+<p class="small muted">ที่มา: Snyk = ผลจาก workflow run 42972770414 บน <code>demo/nextjs-vulnerable</code> (#4) · Aikido = check และ comment ของ aikido-pr-checks[bot] บน #7 · GHAS = Code scanning alerts ของ <code>demo/ghas-vulnerable</code> (#9) และ GitHub dependency graph compare API · โค้ดของ #4, #7, #9 เหมือนกันทุกไฟล์ฟีเจอร์</p>
+</main>
+</body>
+</html>

@@ -80,7 +80,7 @@ nav.toc{font-size:14px}nav.toc a{text-decoration:none}nav.toc ol{margin:4px 0 0;
 </div>
 
 <div class="kpis">
-  <div class="kpi fail"><div class="n">❌ 9</div><div class="l">PR #9 · CodeQL alert ระดับ High/Critical</div></div>
+  <div class="kpi fail"><div class="n">❌ 8</div><div class="l">PR #9 · CodeQL alert ระดับ High/Critical</div></div>
   <div class="kpi"><div class="n">29</div><div class="l">CVE ใน axios + lodash ที่ PR เพิ่มเข้ามา (High 14)</div></div>
   <div class="kpi pass"><div class="n">✅ 0</div><div class="l">PR #10 (secure) · High/Critical</div></div>
   <div class="kpi"><div class="n">~1 นาที</div><div class="l">เวลา job CodeQL + Dependency Review</div></div>
@@ -168,7 +168,7 @@ gh workflow run ci.yml --ref demo/ghas-secure</code></pre>
 <div class="card"><strong>③ report.html</strong> <span class="small muted">· แถว GitHub Advanced Security ในตารางเทียบ 3 tool (artifact <code>security-report</code> หรือ <code>npm run report</code>)</span></div>
 
 <h2 id="pr9">4. ผลสแกน PR #9 (vulnerable) <span class="tag no">FAIL</span></h2>
-<h3>CodeQL: 10 alert (Critical 4 · High 5 · Medium 2)</h3>
+<h3>CodeQL: 10 alert (Critical 4 · High 4 · Medium 2)</h3>
 <div class="wrap"><table>
 <thead><tr><th>ระดับ</th><th>Rule</th><th>ปัญหา</th><th>ไฟล์</th></tr></thead>
 <tbody>
@@ -183,7 +183,7 @@ gh workflow run ci.yml --ref demo/ghas-secure</code></pre>
 <tr><td><span class="sev medium">Medium</span></td><td><code>js/client-side-unvalidated-url-redirection</code></td><td>Client-side URL redirect</td><td><code>app/welcome/WelcomeClient.tsx:30</code></td></tr>
 <tr><td><span class="sev medium">Medium</span></td><td><code>js/missing-origin-check</code></td><td>Missing origin verification in postMessage handler</td><td><code>app/welcome/WelcomeClient.tsx:19</code></td></tr>
 </tbody></table></div>
-<p class="small muted">รอบแรกมี alert ที่ 11 คือ <code>js/incomplete-sanitization</code> ใน <code>scripts/build-report.mjs</code> ซึ่งเป็นโค้ดของ POC เอง แก้แล้ว (ดูข้อ 7) ตัวเลข "9" ใน KPI ด้านบนคือ Critical/High ในโค้ดเดโม (4 + 5)</p>
+<p class="small muted">รอบแรกมี alert ที่ 11 คือ <code>js/incomplete-sanitization</code> ใน <code>scripts/build-report.mjs</code> ซึ่งเป็นโค้ดของ POC เอง แก้แล้ว (ดูข้อ 7) ตัวเลข "8" ใน KPI ด้านบนคือ Critical/High ในโค้ดเดโม (4 + 4)</p>
 
 <h3>Dependency Review: dependency ที่ PR เพิ่มเข้ามา</h3>
 <div class="wrap"><table>

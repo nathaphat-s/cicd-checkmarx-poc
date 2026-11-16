@@ -85,6 +85,7 @@ td.hit{background:var(--pass-bg)}td.miss{background:var(--fail-bg)}td.part{backg
     <li><b>SQL injection</b> (ช่องโหว่คลาสสิกที่สุด) Snyk ไม่รายงาน แต่ Aikido และ GHAS จับได้ ส่วน <b>hardcoded password</b> ไม่มีตัวไหนจับได้เลย</li>
     <li><b>Container image</b> มีแค่ <b class="t-snyk">Snyk</b> ที่สแกน (31 CVE ระดับ High ขึ้นไปใน <code>node:22-bullseye</code>) ส่วน <b>IaC (k8s)</b> ไม่มีตัวไหนรายงานถึงระดับ High</li>
     <li>SCA: ทุกตัวเจอ axios + lodash แต่ให้จำนวนและความรุนแรงต่างกัน เพราะใช้ฐานข้อมูลช่องโหว่คนละชุด</li>
+    <li>สรุปข้อแตกต่างแบบละเอียดอยู่ใน <a href="#insights">หัวข้อ 6</a></li>
   </ul>
 </div>
 
@@ -174,7 +175,79 @@ td.hit{background:var(--pass-bg)}td.miss{background:var(--fail-bg)}td.part{backg
 <tr><td>ค่าใช้จ่ายสำหรับ POC นี้</td><td>ฟรี (จำกัดจำนวน test)</td><td>ฟรีแบบ GitHub App · local scanner / AI ต้องจ่าย</td><td>ฟรี (repo public) · private ต้องซื้อ</td></tr>
 </tbody></table></div>
 
-<h2 id="verdict">6. สรุปและข้อเสนอ</h2>
+<h2 id="insights">6. สิ่งที่เห็นจากตาราง: ข้อแตกต่างของทั้ง 3 ตัว</h2>
+
+<h3>6.1 แต่ละตัวเก่งคนละด้าน ไม่มีตัวไหนจับครบ</h3>
+<div class="tools">
+  <div class="card tool"><h3 class="t-snyk">Snyk</h3>
+    <p class="small"><b>จุดแข็ง:</b> ตัวเดียวที่ครบทุกประเภท (SAST, SCA, IaC, container) และเห็น CVE ใน base image</p>
+    <p class="small"><b>จุดอ่อน:</b> SAST จับโค้ดได้น้อยสุด (5/12) และ<b>พลาด SQL injection</b> ซึ่งเป็นช่องโหว่พื้นฐานที่สุด</p></div>
+  <div class="card tool"><h3 class="t-aik">Aikido</h3>
+    <p class="small"><b>จุดแข็ง:</b> จับ <b>pattern ที่เสี่ยง</b>ได้กว้าง เช่น <code>eval</code>, <code>dangerouslySetInnerHTML</code>, redirect และการอ่านไฟล์ (8/12)</p>
+    <p class="small"><b>จุดอ่อน:</b> พลาด <b>command injection</b> ซึ่งร้ายแรง ให้ SSRF แค่ Medium และแผนฟรีไม่สแกน container / IaC</p></div>
+  <div class="card tool"><h3 class="t-ghas">GHAS</h3>
+    <p class="small"><b>จุดแข็ง:</b> วิเคราะห์ <b>data flow ฝั่ง server</b> ได้ลึก ไล่ input ไปถึงคำสั่งอันตรายจริง จับ command injection, SSRF, ปิด TLS และ SQLi (8/12)</p>
+    <p class="small"><b>จุดอ่อน:</b> พลาด path traversal, <code>dangerouslySetInnerHTML</code>, server redirect และไม่มี container / IaC เลย</p></div>
+</div>
+
+<h3>6.2 ความครอบคลุมแต่ละประเภทต่างกันชัดเจน</h3>
+<div class="wrap"><table>
+<thead><tr><th></th><th>SAST (โค้ด 12 จุด)</th><th>SCA</th><th>Container</th><th>IaC</th></tr></thead>
+<tbody>
+<tr><td class="t-snyk"><b>Snyk</b></td><td class="c part">5/12</td><td class="c hit">✅</td><td class="c hit">✅ ตัวเดียวที่มี</td><td class="c part">🟡 ต่ำกว่า High</td></tr>
+<tr><td class="t-aik"><b>Aikido</b></td><td class="c hit">8/12</td><td class="c hit">✅</td><td class="c miss">❌ (แผนฟรี)</td><td class="c miss">❌</td></tr>
+<tr><td class="t-ghas"><b>GHAS</b></td><td class="c hit">8/12</td><td class="c hit">✅</td><td class="c miss">❌ ไม่รองรับ</td><td class="c miss">❌ ไม่รองรับ</td></tr>
+</tbody></table></div>
+<p class="small">ถ้าระบบรันบน container มีแค่ <b class="t-snyk">Snyk</b> ที่เห็น CVE 31 รายการใน base image</p>
+
+<h3>6.3 Aikido กับ GHAS ได้ 8 เท่ากัน แต่จับคนละชุด</h3>
+<div class="wrap"><table>
+<thead><tr><th>จับได้เฉพาะ <span class="t-aik">Aikido</span></th><th>จับได้ทั้งคู่</th><th>จับได้เฉพาะ <span class="t-ghas">GHAS</span></th></tr></thead>
+<tbody><tr>
+<td class="small">Path traversal<br>Server open redirect<br><code>dangerouslySetInnerHTML</code></td>
+<td class="small">SQL injection · eval (server) · DOM XSS<br>postMessage → eval · client redirect</td>
+<td class="small">Command injection<br>SSRF (ระดับ High ขึ้นไป)<br>ปิด TLS</td>
+</tr></tbody></table></div>
+<p class="small">ใช้คู่กันได้ <b>11/12</b> จุด แปลว่าถ้าเลือกตัวเดียวจะพลาดบางจุดเสมอ</p>
+
+<h3>6.4 ระดับความรุนแรงและตัวเลขไม่ตรงกัน เทียบตรง ๆ ไม่ได้</h3>
+<div class="wrap"><table>
+<thead><tr><th>ตัวอย่าง</th><th class="t-snyk">Snyk</th><th class="t-aik">Aikido</th><th class="t-ghas">GHAS</th></tr></thead>
+<tbody>
+<tr><td>SSRF จุดเดียวกัน</td><td><span class="sev high">High</span></td><td><span class="sev medium">Medium</span> (ไม่บล็อก)</td><td><span class="sev critical">Critical</span></td></tr>
+<tr><td>SQL injection</td><td>ไม่รายงาน</td><td><span class="sev critical">Critical</span></td><td><span class="sev high">High</span></td></tr>
+<tr><td>CVE ใน axios + lodash</td><td>16</td><td>14</td><td>29</td></tr>
+</tbody></table></div>
+<p class="small">แต่ละตัวใช้ฐานข้อมูลช่องโหว่และวิธีให้คะแนนของตัวเอง จะตัดสินว่าตัวไหนดีกว่าต้องดู<b>รายช่องโหว่</b> ไม่ใช่ดูยอดรวม</p>
+
+<h3>6.5 วิธีทำงานและประสบการณ์ของ developer ต่างกัน</h3>
+<div class="wrap"><table>
+<thead><tr><th></th><th class="t-snyk">Snyk</th><th class="t-aik">Aikido</th><th class="t-ghas">GHAS</th></tr></thead>
+<tbody>
+<tr><td>ติดตั้ง</td><td>CLI ใน CI + token</td><td><b>ง่ายสุด</b>: GitHub App ไม่ต้องแก้ CI</td><td>action ทางการ ไม่ต้องมีบัญชีเพิ่ม</td></tr>
+<tr><td>ความเร็ว</td><td>ช้าสุด ~2 นาที 40 วิ (build image)</td><td><b>เร็วสุด</b> ~50 วิ</td><td>~1 นาที</td></tr>
+<tr><td>ผลอยู่ที่ไหน</td><td>Snyk dashboard + CI log</td><td><b>comment บนบรรทัดโค้ด</b></td><td>Security tab ของ GitHub</td></tr>
+<tr><td>ช่วยแก้</td><td>Fix PR สำหรับ dependency</td><td><b>Suggested change กด commit ได้</b></td><td>Copilot Autofix</td></tr>
+<tr><td>สิ่งที่รายงาน</td><td>ทุกปัญหาในโค้ด</td><td>เฉพาะปัญหา<b>ใหม่</b>ของ PR</td><td>ทุกปัญหา (CodeQL)</td></tr>
+<tr><td>สิ่งที่ต้องตั้งเพิ่ม</td><td>—</td><td>ปรับเกณฑ์จาก Critical เป็น High</td><td>เขียน gate เอง (CodeQL ไม่ fail เอง)</td></tr>
+</tbody></table></div>
+
+<h3>6.6 จุดบอดร่วมของทั้ง 3 ตัว</h3>
+<div class="callout warn small"><b>ไม่มีตัวไหนจับ hardcoded password</b> <code>"SuperSecret123!"</code> ได้ และ <b>unit test ด้าน security จับ SQL injection ได้ทั้งที่ Snyk พลาด</b> scanner จึงแทน test ไม่ได้ ยังต้องมี security regression test และ secret scanner ที่จับรหัสผ่านทั่วไป (เช่น gitleaks)</div>
+
+<h3>6.7 ใครเหมาะกับอะไร</h3>
+<div class="wrap"><table>
+<thead><tr><th>ถ้าต้องการ…</th><th>เลือก</th></tr></thead>
+<tbody>
+<tr><td>ครบทุกประเภทในตัวเดียว รวม container</td><td class="t-snyk"><b>Snyk</b> (ต้องเสริม SAST)</td></tr>
+<tr><td>จับช่องโหว่ในโค้ดได้มาก ติดตั้งง่าย developer อ่านง่าย</td><td class="t-aik"><b>Aikido</b></td></tr>
+<tr><td>repo อยู่บน GitHub เน้น SAST เชิงลึก ไม่อยากเพิ่ม vendor</td><td class="t-ghas"><b>GHAS</b> (ฟรีเฉพาะ public)</td></tr>
+<tr><td>ครอบคลุมโค้ดมากที่สุด</td><td><b>GHAS + Aikido</b> (11/12)</td></tr>
+<tr><td>ครอบคลุมโค้ด + container + IaC</td><td><b>Snyk + GHAS</b> (9/12 + container)</td></tr>
+</tbody></table></div>
+<p class="small muted">ผลนี้มาจากเดโม Next.js ที่ฝังช่องโหว่ 12 จุด ก่อนตัดสินใจจริงควรทดสอบกับโค้ดของ portal จริงด้วย</p>
+
+<h2 id="verdict">7. สรุปและข้อเสนอ</h2>
 <div class="two">
   <div class="card"><strong>ถ้าเลือกตัวเดียว</strong>
     <ul class="small">
